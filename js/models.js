@@ -1,7 +1,36 @@
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
 const MODEL_ID = "Xenova/yolos-tiny";
-const DTYPE = "q8";
+const DTYPE = "auto";
+
+const DEFAULT_DTYPE_BY_DEVICE = {
+  webgpu: "fp16",
+  wasm: "q8",
+};
+
+async function pickDevice() {
+  if (!navigator.gpu) {
+    return "wasm";
+  }
+
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    return adapter ? "webgpu" : "wasm";
+  } catch {
+    return "wasm";
+  }
+}
+
+const resolvedDevicePromise = pickDevice();
+
+function resolveDtypeForDevice(device) {
+  // Keep this easy to override: set DTYPE to "q8"/"fp16"/"fp32" to force it.
+  // When DTYPE is "auto", prefer fp16 on WebGPU and q8 on WASM fallback.
+  if (DTYPE !== "auto") {
+    return DTYPE;
+  }
+  return DEFAULT_DTYPE_BY_DEVICE[device] ?? "q8";
+}
 
 const MODEL_CONFIG = {
   objectDetector: {
@@ -78,10 +107,14 @@ export async function loadModel(modelName) {
   // EXPERIMENT
   const _tStart = performance.now();
   console.log(`[TIMING] ${modelName}: loading started`);
-  const pipelineOptions =
-    modelName === "objectDetector"
-      ? { dtype: DTYPE }
-      : { quantized: true };
+
+  let pipelineOptions = { quantized: true };
+  if (modelName === "objectDetector") {
+    const device = await resolvedDevicePromise;
+    const dtype = resolveDtypeForDevice(device);
+    pipelineOptions = { device, dtype };
+    console.log(`[BACKEND] device=${device} dtype=${dtype}`);
+  }
 
   loadingPromises[modelName] = pipeline(config.task, config.model, {
     ...pipelineOptions,
