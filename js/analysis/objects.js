@@ -122,9 +122,24 @@ function drawBoundingBoxes(container, results, dimensionSource) {
   container.appendChild(layer);
 }
 
+export function renderBoundingBoxesOnContainer(container, results, dimensionSource) {
+  const image = dimensionSource ?? container.querySelector("img");
+  if (!image) {
+    return;
+  }
+
+  const existingLayer = container.querySelector(".bounding-boxes");
+  if (!results?.length) {
+    existingLayer?.remove();
+    return;
+  }
+
+  drawBoundingBoxes(container, results, dimensionSource);
+}
+
 function boxToPercentages(box, image) {
-  const width = image.naturalWidth || image.width;
-  const height = image.naturalHeight || image.height;
+  const width = image.videoWidth || image.naturalWidth || image.width;
+  const height = image.videoHeight || image.naturalHeight || image.height;
 
   if (!width || !height) {
     return null;
@@ -153,7 +168,7 @@ function boxToPercentages(box, image) {
   };
 }
 
-export async function detectObjects(imageSrc, options) {
+export async function detectObjectsFromSource(source, options) {
   const { threshold, maxObjects } = options;
 
   await loadModel("objectDetector");
@@ -161,7 +176,7 @@ export async function detectObjects(imageSrc, options) {
 
   // EXPERIMENT
   const _tObj = performance.now();
-  const rawResults = await model(imageSrc, { threshold });
+  const rawResults = await model(source, { threshold });
   console.log(
     `[TIMING] objects: ${((performance.now() - _tObj) / 1000).toFixed(2)}s`,
   );
@@ -180,6 +195,10 @@ export async function detectObjects(imageSrc, options) {
       ymax: item.box.ymax,
     },
   }));
+}
+
+export async function detectObjects(imageSrc, options) {
+  return detectObjectsFromSource(imageSrc, options);
 }
 
 export function groupObjectsByLabel(objects) {
@@ -250,7 +269,7 @@ export function renderBoundingBoxes(
   }
 
   if (targetContainer) {
-    drawBoundingBoxes(targetContainer, results, dimensionSource);
+    renderBoundingBoxesOnContainer(targetContainer, results, dimensionSource);
     return;
   }
 
@@ -261,7 +280,7 @@ export function renderBoundingBoxes(
     return;
   }
 
-  drawBoundingBoxes(container, results, dimensionSource);
+  renderBoundingBoxesOnContainer(container, results, dimensionSource);
 }
 
 export {
