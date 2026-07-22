@@ -1874,6 +1874,12 @@ button {
   gap: 12px;
 }
 
+.live-metrics__row--gps dd {
+  max-width: 62%;
+  text-align: right;
+  word-break: break-all;
+}
+
 .live-metrics__row dt {
   margin: 0;
   color: rgba(255, 255, 255, 0.78);
@@ -1883,6 +1889,25 @@ button {
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.camera-modal__record {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-panel);
+  color: var(--color-text);
+}
+
+.camera-modal__record:hover {
+  background-color: var(--color-bg-hover, #f5f5f5);
+}
+
+.camera-modal__record--active {
+  border-color: #c0392b;
+  background-color: #c0392b;
+  color: #ffffff;
 }
 
 .camera-modal__video {

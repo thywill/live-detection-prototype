@@ -1,6 +1,6 @@
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
-const MODEL_ID = "Xenova/yolos-tiny";
+export const MODEL_ID = "Xenova/yolos-tiny";
 const DTYPE = "auto";
 
 const DEFAULT_DTYPE_BY_DEVICE = {

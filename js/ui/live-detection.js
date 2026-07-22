@@ -1,6 +1,12 @@
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
-import { getObjectDetectorBackend } from "../models.js";
+import { getObjectDetectorBackend, MODEL_ID } from "../models.js";
+import { createGpsTracker } from "../utils/geolocation.js";
+import {
+  clearLiveDetectionLog,
+  getLiveDetectionLogCount,
+  logDetectionFrame,
+} from "../live/detection-log.js";
 import {
   detectObjectsFromSource,
   renderBoundingBoxesOnContainer,
@@ -44,6 +50,19 @@ function formatMetricFps(value) {
   return value === null ? "—" : value.toFixed(2);
 }
 
+function formatGpsFix(fix) {
+  if (!fix) {
+    return "—";
+  }
+  const lat = fix.lat.toFixed(8);
+  const lon = fix.lon.toFixed(8);
+  const accuracy =
+    fix.accuracy === null || fix.accuracy === undefined
+      ? "—"
+      : `±${Math.round(fix.accuracy)}m`;
+  return `${lat}, ${lon} ${accuracy}`;
+}
+
 function canvasToPipelineInput(canvas) {
   if (typeof RawImage?.fromCanvas === "function") {
     return RawImage.fromCanvas(canvas);
@@ -76,9 +95,14 @@ export async function openLiveDetectionModal() {
             <div class="live-metrics__row"><dt>Avg (30)</dt><dd data-metric="avg">—</dd></div>
             <div class="live-metrics__row"><dt>Effective FPS</dt><dd data-metric="fps">—</dd></div>
             <div class="live-metrics__row"><dt>Frames</dt><dd data-metric="frames">0</dd></div>
+            <div class="live-metrics__row live-metrics__row--gps"><dt>GPS</dt><dd data-metric="gps">—</dd></div>
+            <div class="live-metrics__row"><dt>Logged</dt><dd data-metric="logged">0</dd></div>
           </dl>
         </div>
       </div>
+      <button type="button" class="camera-modal__record" aria-pressed="false">
+        Start Recording
+      </button>
       <button type="button" class="camera-modal__cancel">Stop Live Detection</button>
     </div>
   `;
@@ -86,9 +110,13 @@ export async function openLiveDetectionModal() {
   const video = overlay.querySelector(".camera-modal__video");
   const mediaWrap = overlay.querySelector(".camera-modal__media");
   const stopButton = overlay.querySelector(".camera-modal__cancel");
+  const recordButton = overlay.querySelector(".camera-modal__record");
   const card = overlay.querySelector(".camera-modal__card");
   const metricsPanel = overlay.querySelector(".live-metrics");
   const metrics = createLiveMetricsTracker();
+  const backendInfo = await getObjectDetectorBackend();
+  let isRecording = false;
+  let gpsFix = null;
 
   const frameCanvas = document.createElement("canvas");
   let frameW = 0;
@@ -96,6 +124,8 @@ export async function openLiveDetectionModal() {
   let running = true;
   let busy = false;
   let animationFrameId = null;
+
+  clearLiveDetectionLog();
 
   function updateMetricsPanel() {
     const snapshot = metrics.getSnapshot();
@@ -107,12 +137,20 @@ export async function openLiveDetectionModal() {
       formatMetricFps(snapshot.effectiveFps);
     metricsPanel.querySelector('[data-metric="frames"]').textContent =
       String(snapshot.frameCount);
+    metricsPanel.querySelector('[data-metric="gps"]').textContent =
+      formatGpsFix(gpsFix);
+    metricsPanel.querySelector('[data-metric="logged"]').textContent =
+      String(getLiveDetectionLogCount());
   }
 
-  getObjectDetectorBackend().then(({ device, dtype }) => {
-    metricsPanel.querySelector('[data-metric="backend"]').textContent =
-      `${device} · ${dtype}`;
+  metricsPanel.querySelector('[data-metric="backend"]').textContent =
+    `${backendInfo.device} · ${backendInfo.dtype}`;
+
+  const gps = createGpsTracker((fix) => {
+    gpsFix = fix;
+    updateMetricsPanel();
   });
+  gps.start();
 
   function stopStream() {
     for (const track of stream?.getTracks?.() ?? []) {
@@ -122,6 +160,7 @@ export async function openLiveDetectionModal() {
 
   function closeModal() {
     running = false;
+    gps.stop();
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
     }
@@ -161,6 +200,20 @@ export async function openLiveDetectionModal() {
       metrics.recordInferenceMs(inferenceMs);
       updateMetricsPanel();
       renderBoundingBoxesOnContainer(mediaWrap, detections, video);
+
+      if (isRecording) {
+        logDetectionFrame({
+          detections,
+          frameW,
+          frameH,
+          inferenceMs,
+          timestamp: Date.now(),
+          gpsFix: gps.getFix(),
+          backend: backendInfo,
+          modelId: MODEL_ID,
+        });
+        updateMetricsPanel();
+      }
     } catch (error) {
       console.error("[LIVE] detection failed:", error);
     } finally {
@@ -176,6 +229,16 @@ export async function openLiveDetectionModal() {
     tick();
     animationFrameId = requestAnimationFrame(loop);
   }
+
+  recordButton.addEventListener("click", () => {
+    isRecording = !isRecording;
+    recordButton.textContent = isRecording ? "Stop Recording" : "Start Recording";
+    recordButton.classList.toggle("camera-modal__record--active", isRecording);
+    recordButton.setAttribute("aria-pressed", String(isRecording));
+    if (isRecording) {
+      updateMetricsPanel();
+    }
+  });
 
   stopButton.addEventListener("click", closeModal);
 
