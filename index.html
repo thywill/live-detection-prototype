@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Analysis Tool</title>
+  <link rel="stylesheet" href="style/main.css">
+</head>
+<body>
+  <header class="top-nav">
+    <h1 class="top-nav__title">Visual Analysis Tool</h1>
+    <nav class="top-nav__actions" aria-label="Primary actions">
+      <button type="button" id="btn-upload" class="btn btn--primary">Upload Images</button>
+      <button type="button" id="btn-camera" class="btn btn--secondary top-nav__icon-btn" aria-label="Capture image">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+      <button type="button" id="btn-compare" class="btn btn--secondary top-nav__compare">Compare Selected</button>
+    </nav>
+  </header>
+
+  <div class="mobile-top-bar" id="mobile-top-bar">
+    <span class="mobile-top-bar__title">Visual Analysis Tool</span>
+    <button
+      type="button"
+      id="mobile-top-settings-btn"
+      class="btn btn--secondary mobile-top-bar__settings"
+      aria-label="Open analysis settings"
+    >
+      ⚙️
+    </button>
+  </div>
+
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar" aria-label="Analysis controls">
+      <section class="sidebar__section" aria-labelledby="sidebar-heading-analysis">
+        <h2 id="sidebar-heading-analysis" class="sidebar__heading">Analysis</h2>
+        <ul class="toggle-list">
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-objects">
+              <input
+                type="checkbox"
+                id="toggle-objects"
+                class="toggle__input"
+                name="analysis-objects"
+                checked
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Objects</span>
+            </label>
+          </li>
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-color">
+              <input
+                type="checkbox"
+                id="toggle-color"
+                class="toggle__input"
+                name="analysis-color"
+                checked
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Color</span>
+            </label>
+          </li>
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-caption">
+              <input
+                type="checkbox"
+                id="toggle-caption"
+                class="toggle__input"
+                name="analysis-caption"
+                checked
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Caption</span>
+            </label>
+          </li>
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-composition">
+              <input
+                type="checkbox"
+                id="toggle-composition"
+                class="toggle__input"
+                name="analysis-composition"
+                checked
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Composition</span>
+            </label>
+          </li>
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-emotion">
+              <input
+                type="checkbox"
+                id="toggle-emotion"
+                class="toggle__input"
+                name="analysis-emotion"
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Emotion (Portraits)</span>
+            </label>
+          </li>
+          <li class="toggle-list__item">
+            <label class="toggle" for="toggle-photo-style">
+              <input
+                type="checkbox"
+                id="toggle-photo-style"
+                class="toggle__input"
+                name="analysis-photo-style"
+              >
+              <span class="toggle__switch" aria-hidden="true"></span>
+              <span class="toggle__label">Photo Style</span>
+            </label>
+          </li>
+        </ul>
+      </section>
+
+      <section class="sidebar__section" aria-labelledby="sidebar-heading-parameters">
+        <h2 id="sidebar-heading-parameters" class="sidebar__heading">Parameters</h2>
+
+        <div class="slider-group">
+          <label class="slider-label" for="param-confidence">
+            <span class="slider-label__name">Confidence</span>
+            <output id="param-confidence-value" class="slider-label__value" for="param-confidence">0.5</output>
+          </label>
+          <input
+            type="range"
+            id="param-confidence"
+            class="slider"
+            name="param-confidence"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0.5"
+          >
+        </div>
+
+        <div class="slider-group">
+          <label class="slider-label" for="param-max-objects">
+            <span class="slider-label__name">Max Objects</span>
+            <output id="param-max-objects-value" class="slider-label__value" for="param-max-objects">10</output>
+          </label>
+          <input
+            type="range"
+            id="param-max-objects"
+            class="slider"
+            name="param-max-objects"
+            min="1"
+            max="50"
+            step="1"
+            value="10"
+          >
+        </div>
+
+        <div class="slider-group">
+          <label class="slider-label" for="param-colors-extract">
+            <span class="slider-label__name">Colors to Extract</span>
+            <output id="param-colors-extract-value" class="slider-label__value" for="param-colors-extract">5</output>
+          </label>
+          <input
+            type="range"
+            id="param-colors-extract"
+            class="slider"
+            name="param-colors-extract"
+            min="1"
+            max="20"
+            step="1"
+            value="5"
+          >
+        </div>
+      </section>
+
+      <hr class="sidebar__divider">
+
+      <div class="sidebar__footer">
+        <button type="button" id="btn-reset-defaults" class="btn btn--text">Reset Defaults</button>
+      </div>
+    </aside>
+
+    <main id="main-content" class="main-content">
+      <div id="upload-zone" class="upload-zone" role="button" tabindex="0" aria-label="Upload images">
+        <input
+          type="file"
+          id="file-input"
+          class="upload-zone__input"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          hidden
+        >
+        <div class="upload-zone__icon" aria-hidden="true">
+          <svg class="upload-zone__icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V4m0 0l-4 4m4-4l4 4"/>
+            <path d="M4 20h16a2 2 0 0 0 2-2v-1a6 6 0 0 0-6-6H8a6 6 0 0 0-6 6v1a2 2 0 0 0 2 2z"/>
+          </svg>
+        </div>
+        <p class="upload-zone__title">Drop images here</p>
+        <p class="upload-zone__subtitle">Supports JPG, PNG, WEBP · Single or multiple images</p>
+        <p class="upload-zone__note">Models load once and cache in your browser — no data is sent to any server</p>
+      </div>
+    </main>
+  </div>
+
+  <div id="mobile-settings-overlay" class="mobile-settings-overlay"></div>
+  <section id="mobile-settings-sheet" class="mobile-settings-sheet" aria-label="Analysis Settings">
+    <div class="mobile-settings-sheet__handle" aria-hidden="true"></div>
+    <h2 class="mobile-settings-sheet__title">Analysis Settings</h2>
+    <ul class="mobile-settings-sheet__toggles">
+      <li class="toggle-list__item">
+        <label class="toggle" for="mobile-toggle-objects">
+          <input type="checkbox" id="mobile-toggle-objects" class="toggle__input" name="mobile-analysis-objects">
+          <span class="toggle__switch" aria-hidden="true"></span>
+          <span class="toggle__label">Objects</span>
+        </label>
+      </li>
+      <li class="toggle-list__item">
+        <label class="toggle" for="mobile-toggle-color">
+          <input type="checkbox" id="mobile-toggle-color" class="toggle__input" name="mobile-analysis-color">
+          <span class="toggle__switch" aria-hidden="true"></span>
+          <span class="toggle__label">Color</span>
+        </label>
+      </li>
+      <li class="toggle-list__item">
+        <label class="toggle" for="mobile-toggle-caption">
+          <input type="checkbox" id="mobile-toggle-caption" class="toggle__input" name="mobile-analysis-caption">
+          <span class="toggle__switch" aria-hidden="true"></span>
+          <span class="toggle__label">Caption</span>
+        </label>
+      </li>
+      <li class="toggle-list__item">
+        <label class="toggle" for="mobile-toggle-composition">
+          <input type="checkbox" id="mobile-toggle-composition" class="toggle__input" name="mobile-analysis-composition">
+          <span class="toggle__switch" aria-hidden="true"></span>
+          <span class="toggle__label">Composition</span>
+        </label>
+      </li>
+      <li class="toggle-list__item">
+        <label class="toggle" for="mobile-toggle-emotion">
+          <input type="checkbox" id="mobile-toggle-emotion" class="toggle__input" name="mobile-analysis-emotion">
+          <span class="toggle__switch" aria-hidden="true"></span>
+          <span class="toggle__label">Emotion</span>
+        </label>
+      </li>
+    </ul>
+    <button type="button" id="mobile-settings-done" class="btn btn--primary mobile-settings-sheet__done">Done</button>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
