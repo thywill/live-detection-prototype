@@ -14,7 +14,7 @@ function escapeCsvValue(value) {
   return stringValue;
 }
 
-function downloadFile(content, filename, mimeType) {
+export function downloadFile(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

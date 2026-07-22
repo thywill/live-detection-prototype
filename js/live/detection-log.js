@@ -1,6 +1,11 @@
 // caption is reserved for a future optional field (§6).
 
 const log = [];
+let sessionStart = null;
+
+export function getLiveDetectionSessionStart() {
+  return sessionStart;
+}
 
 export function getLiveDetectionLog() {
   return log;
@@ -12,6 +17,7 @@ export function getLiveDetectionLogCount() {
 
 export function clearLiveDetectionLog() {
   log.length = 0;
+  sessionStart = Date.now();
 }
 
 function normalizeBbox(box, frameW, frameH) {

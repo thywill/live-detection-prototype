@@ -1910,6 +1910,26 @@ button {
   color: #ffffff;
 }
 
+.camera-modal__exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.camera-modal__export {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-panel);
+  color: var(--color-text);
+}
+
+.camera-modal__export:hover {
+  background-color: var(--color-bg-hover, #f5f5f5);
+}
+
 .camera-modal__video {
   width: 100%;
   max-height: 60vh;

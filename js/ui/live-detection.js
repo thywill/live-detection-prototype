@@ -8,6 +8,10 @@ import {
   logDetectionFrame,
 } from "../live/detection-log.js";
 import {
+  exportLiveDetectionCsv,
+  exportLiveDetectionJson,
+} from "../live/export-live.js";
+import {
   detectObjectsFromSource,
   renderBoundingBoxesOnContainer,
 } from "../analysis/objects.js";
@@ -103,6 +107,14 @@ export async function openLiveDetectionModal() {
       <button type="button" class="camera-modal__record" aria-pressed="false">
         Start Recording
       </button>
+      <div class="camera-modal__exports">
+        <button type="button" class="camera-modal__export" data-export="csv">
+          Export CSV
+        </button>
+        <button type="button" class="camera-modal__export" data-export="json">
+          Export JSON
+        </button>
+      </div>
       <button type="button" class="camera-modal__cancel">Stop Live Detection</button>
     </div>
   `;
@@ -111,10 +123,13 @@ export async function openLiveDetectionModal() {
   const mediaWrap = overlay.querySelector(".camera-modal__media");
   const stopButton = overlay.querySelector(".camera-modal__cancel");
   const recordButton = overlay.querySelector(".camera-modal__record");
+  const exportCsvButton = overlay.querySelector('[data-export="csv"]');
+  const exportJsonButton = overlay.querySelector('[data-export="json"]');
   const card = overlay.querySelector(".camera-modal__card");
   const metricsPanel = overlay.querySelector(".live-metrics");
   const metrics = createLiveMetricsTracker();
   const backendInfo = await getObjectDetectorBackend();
+  const exportBackend = { ...backendInfo, model: MODEL_ID };
   let isRecording = false;
   let gpsFix = null;
 
@@ -238,6 +253,21 @@ export async function openLiveDetectionModal() {
     if (isRecording) {
       updateMetricsPanel();
     }
+  });
+
+  function handleExport(exporter) {
+    const ok = exporter(exportBackend);
+    if (!ok) {
+      showCameraFeedback("Nothing to export — start recording first");
+    }
+  }
+
+  exportCsvButton.addEventListener("click", () => {
+    handleExport(exportLiveDetectionCsv);
+  });
+
+  exportJsonButton.addEventListener("click", () => {
+    handleExport(exportLiveDetectionJson);
   });
 
   stopButton.addEventListener("click", closeModal);
