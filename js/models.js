@@ -32,6 +32,14 @@ function resolveDtypeForDevice(device) {
   return DEFAULT_DTYPE_BY_DEVICE[device] ?? "q8";
 }
 
+export async function getObjectDetectorBackend() {
+  const device = await resolvedDevicePromise;
+  return {
+    device,
+    dtype: resolveDtypeForDevice(device),
+  };
+}
+
 const MODEL_CONFIG = {
   objectDetector: {
     task: "object-detection",
