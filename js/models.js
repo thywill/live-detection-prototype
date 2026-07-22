@@ -1,9 +1,12 @@
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
+const MODEL_ID = "Xenova/yolos-tiny";
+const DTYPE = "q8";
+
 const MODEL_CONFIG = {
   objectDetector: {
     task: "object-detection",
-    model: "Xenova/detr-resnet-50",
+    model: MODEL_ID,
   },
   captioner: {
     task: "image-to-text",
@@ -75,8 +78,13 @@ export async function loadModel(modelName) {
   // EXPERIMENT
   const _tStart = performance.now();
   console.log(`[TIMING] ${modelName}: loading started`);
+  const pipelineOptions =
+    modelName === "objectDetector"
+      ? { dtype: DTYPE }
+      : { quantized: true };
+
   loadingPromises[modelName] = pipeline(config.task, config.model, {
-    quantized: true,
+    ...pipelineOptions,
   })
     .then((instance) => {
       models[modelName] = instance;
