@@ -1,6 +1,11 @@
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
-import { getObjectDetectorBackend, MODEL_ID } from "../models.js";
+import {
+  getObjectDetectorBackend,
+  loadModel,
+  MODEL_ID,
+  setLiveDetectionActive,
+} from "../models.js";
 import { createGpsTracker } from "../utils/geolocation.js";
 import {
   clearLiveDetectionLog,
@@ -18,6 +23,7 @@ import {
 import { getSettings } from "./sidebar.js";
 
 const ROLLING_WINDOW = 30;
+const MAX_INFERENCE_EDGE = 640;
 
 function createLiveMetricsTracker() {
   const inferenceTimes = [];
@@ -67,11 +73,48 @@ function formatGpsFix(fix) {
   return `${lat}, ${lon} ${accuracy}`;
 }
 
-function canvasToPipelineInput(canvas) {
-  if (typeof RawImage?.fromCanvas === "function") {
-    return RawImage.fromCanvas(canvas);
+function computeInferenceSize(videoW, videoH) {
+  const longest = Math.max(videoW, videoH);
+  if (longest <= MAX_INFERENCE_EDGE) {
+    return { width: videoW, height: videoH };
   }
-  return canvas.toDataURL("image/jpeg", 0.92);
+  const scale = MAX_INFERENCE_EDGE / longest;
+  return {
+    width: Math.max(1, Math.round(videoW * scale)),
+    height: Math.max(1, Math.round(videoH * scale)),
+  };
+}
+
+function createPipelineInputHelper(ctx) {
+  let rawImage = null;
+
+  return function canvasToPipelineInput(canvas) {
+    if (typeof RawImage !== "function") {
+      return canvas.toDataURL("image/jpeg", 0.85);
+    }
+
+    const { width, height } = canvas;
+    const imageData = ctx.getImageData(0, 0, width, height);
+
+    if (
+      rawImage &&
+      rawImage.width === width &&
+      rawImage.height === height &&
+      rawImage.data?.length === imageData.data.length
+    ) {
+      rawImage.data.set(imageData.data);
+      return rawImage;
+    }
+
+    // Recreate only when frame size changes (not every tick).
+    rawImage = new RawImage(
+      new Uint8ClampedArray(imageData.data),
+      width,
+      height,
+      4,
+    );
+    return rawImage;
+  };
 }
 
 export async function openLiveDetectionModal() {
@@ -83,6 +126,19 @@ export async function openLiveDetectionModal() {
     showCameraFeedback(
       "Camera access was denied — please use Upload Images instead",
     );
+    return;
+  }
+
+  setLiveDetectionActive(true);
+  try {
+    await loadModel("objectDetector");
+  } catch (error) {
+    setLiveDetectionActive(false);
+    showCameraFeedback("Object detector failed to load");
+    console.error("[LIVE] detector preload failed:", error);
+    for (const track of stream?.getTracks?.() ?? []) {
+      track.stop();
+    }
     return;
   }
 
@@ -134,6 +190,8 @@ export async function openLiveDetectionModal() {
   let gpsFix = null;
 
   const frameCanvas = document.createElement("canvas");
+  const frameCtx = frameCanvas.getContext("2d", { willReadFrequently: true });
+  const canvasToPipelineInput = createPipelineInputHelper(frameCtx);
   let frameW = 0;
   let frameH = 0;
   let running = true;
@@ -175,6 +233,7 @@ export async function openLiveDetectionModal() {
 
   function closeModal() {
     running = false;
+    setLiveDetectionActive(false);
     gps.stop();
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
@@ -188,17 +247,27 @@ export async function openLiveDetectionModal() {
       return;
     }
 
-    frameW = video.videoWidth;
-    frameH = video.videoHeight;
-    if (!frameW || !frameH) {
+    const videoW = video.videoWidth;
+    const videoH = video.videoHeight;
+    if (!videoW || !videoH) {
       return;
     }
 
-    busy = true;
+    const sized = computeInferenceSize(videoW, videoH);
+    // Only resize when needed — setting canvas width/height every frame
+    // reallocates the backing store and thrashs Safari memory.
+    if (
+      frameCanvas.width !== sized.width ||
+      frameCanvas.height !== sized.height
+    ) {
+      frameCanvas.width = sized.width;
+      frameCanvas.height = sized.height;
+    }
+    frameW = sized.width;
+    frameH = sized.height;
 
-    frameCanvas.width = frameW;
-    frameCanvas.height = frameH;
-    frameCanvas.getContext("2d").drawImage(video, 0, 0, frameW, frameH);
+    busy = true;
+    frameCtx.drawImage(video, 0, 0, frameW, frameH);
 
     const { parameters } = getSettings();
     const t0 = performance.now();
@@ -214,7 +283,8 @@ export async function openLiveDetectionModal() {
       console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
       metrics.recordInferenceMs(inferenceMs);
       updateMetricsPanel();
-      renderBoundingBoxesOnContainer(mediaWrap, detections, video);
+      // Dimension source must match the downscaled inference canvas.
+      renderBoundingBoxesOnContainer(mediaWrap, detections, frameCanvas);
 
       if (isRecording) {
         logDetectionFrame({

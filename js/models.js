@@ -3,6 +3,12 @@ import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers
 export const MODEL_ID = "Xenova/yolos-tiny";
 const DTYPE = "auto";
 
+let liveDetectionActive = false;
+
+export function setLiveDetectionActive(active) {
+  liveDetectionActive = Boolean(active);
+}
+
 const DEFAULT_DTYPE_BY_DEVICE = {
   webgpu: "fp16",
   wasm: "q8",
@@ -97,6 +103,12 @@ export function getModel(modelName) {
 }
 
 export async function loadModel(modelName) {
+  if (liveDetectionActive && modelName !== "objectDetector") {
+    throw new Error(
+      `Live detection is active — refusing to load ${modelName}`,
+    );
+  }
+
   if (isModelReady(modelName)) {
     return models[modelName];
   }
