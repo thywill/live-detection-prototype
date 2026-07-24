@@ -25,6 +25,17 @@ import { getSettings } from "./sidebar.js";
 const ROLLING_WINDOW = 30;
 const MAX_INFERENCE_EDGE = 640;
 
+function resolveInferenceIntervalMs() {
+  // Space out inferences on touch devices so Safari can reclaim memory.
+  // Desktop stays unthrottled (interval 0).
+  const coarsePointer =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  return coarsePointer ? 700 : 0;
+}
+
+const INFERENCE_INTERVAL_MS = resolveInferenceIntervalMs();
+
 function createLiveMetricsTracker() {
   const inferenceTimes = [];
   let frameCount = 0;
@@ -197,6 +208,9 @@ export async function openLiveDetectionModal() {
   let running = true;
   let busy = false;
   let animationFrameId = null;
+  let lastCompletedInferenceAt = 0;
+
+  console.log(`[LIVE] INFERENCE_INTERVAL_MS=${INFERENCE_INTERVAL_MS}`);
 
   clearLiveDetectionLog();
 
@@ -247,6 +261,13 @@ export async function openLiveDetectionModal() {
       return;
     }
 
+    if (
+      INFERENCE_INTERVAL_MS > 0 &&
+      performance.now() - lastCompletedInferenceAt < INFERENCE_INTERVAL_MS
+    ) {
+      return;
+    }
+
     const videoW = video.videoWidth;
     const videoH = video.videoHeight;
     if (!videoW || !videoH) {
@@ -280,6 +301,7 @@ export async function openLiveDetectionModal() {
       });
       const t1 = performance.now();
       const inferenceMs = t1 - t0;
+      lastCompletedInferenceAt = performance.now();
       console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
       metrics.recordInferenceMs(inferenceMs);
       updateMetricsPanel();

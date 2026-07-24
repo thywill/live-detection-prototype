@@ -16,13 +16,30 @@ const DEFAULT_DTYPE_BY_DEVICE = {
 
 async function pickDevice() {
   if (!navigator.gpu) {
+    console.log("[BACKEND] navigator.gpu missing → wasm");
     return "wasm";
   }
 
   try {
     const adapter = await navigator.gpu.requestAdapter();
-    return adapter ? "webgpu" : "wasm";
-  } catch {
+    if (adapter) {
+      const info =
+        typeof adapter.requestAdapterInfo === "function"
+          ? await adapter.requestAdapterInfo().catch(() => null)
+          : null;
+      console.log("[BACKEND] WebGPU adapter available → webgpu", info ?? "");
+      return "webgpu";
+    }
+
+    console.log(
+      "[BACKEND] requestAdapter() returned null → wasm (no adapter)",
+    );
+    return "wasm";
+  } catch (error) {
+    console.log(
+      "[BACKEND] requestAdapter() threw → wasm",
+      error?.message ?? error,
+    );
     return "wasm";
   }
 }
