@@ -10,8 +10,5 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
-  "dependencies": {
-    "node-vibrant": "^3.1.6"
-  }
+  "type": "module"
 }

@@ -68,32 +68,14 @@ const MODEL_CONFIG = {
     task: "object-detection",
     model: MODEL_ID,
   },
-  captioner: {
-    task: "image-to-text",
-    model: "Xenova/vit-gpt2-image-captioning",
-  },
-  emotionDetector: {
-    task: "image-classification",
-    model: "Xenova/facial-emotion-recognition",
-  },
-  sceneClassifier: {
-    task: "image-classification",
-    model: "Xenova/vit-base-patch16-224",
-  },
 };
 
 const models = {
   objectDetector: null,
-  captioner: null,
-  emotionDetector: null,
-  sceneClassifier: null,
 };
 
 export const modelStatus = {
   objectDetector: "idle",
-  captioner: "idle",
-  emotionDetector: "idle",
-  sceneClassifier: "idle",
 };
 
 const loadingPromises = {};
@@ -120,12 +102,6 @@ export function getModel(modelName) {
 }
 
 export async function loadModel(modelName) {
-  if (liveDetectionActive && modelName !== "objectDetector") {
-    throw new Error(
-      `Live detection is active — refusing to load ${modelName}`,
-    );
-  }
-
   if (isModelReady(modelName)) {
     return models[modelName];
   }
@@ -141,20 +117,16 @@ export async function loadModel(modelName) {
 
   setModelStatus(modelName, "loading");
 
-  // EXPERIMENT
   const _tStart = performance.now();
   console.log(`[TIMING] ${modelName}: loading started`);
 
-  let pipelineOptions = { quantized: true };
-  if (modelName === "objectDetector") {
-    const device = await resolvedDevicePromise;
-    const dtype = resolveDtypeForDevice(device);
-    pipelineOptions = { device, dtype };
-    console.log(`[BACKEND] device=${device} dtype=${dtype}`);
-  }
+  const device = await resolvedDevicePromise;
+  const dtype = resolveDtypeForDevice(device);
+  console.log(`[BACKEND] device=${device} dtype=${dtype}`);
 
   loadingPromises[modelName] = pipeline(config.task, config.model, {
-    ...pipelineOptions,
+    device,
+    dtype,
   })
     .then((instance) => {
       models[modelName] = instance;
