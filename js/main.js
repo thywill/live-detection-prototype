@@ -2,7 +2,7 @@ import { loadModel } from "./models.js";
 import { initGallery, renderGallery, getSelectedImages, updateGalleryCard } from "./ui/gallery.js";
 import { initSidebar, getSettings } from "./ui/sidebar.js";
 import { showCameraFeedback, requestCameraStream } from "./utils/camera.js";
-import { openLiveDetectionModal } from "./ui/live-detection.js";
+import { initLiveDetectionPage } from "./ui/live-detection.js";
 import { openCompareView } from "./ui/compare.js";
 import { initMobileView } from "./ui/mobile.js";
 import { extractColors, renderColorStrip } from "./analysis/color.js";
@@ -266,7 +266,6 @@ function initUploadHandlers() {
   const fileInput = document.getElementById("file-input");
   const uploadButton = document.getElementById("btn-upload");
   const cameraButton = document.getElementById("btn-camera");
-  const liveButton = document.getElementById("btn-live-detection");
   const uploadZone = document.getElementById("upload-zone");
 
   if (!fileInput || !uploadButton || !uploadZone) {
@@ -287,12 +286,6 @@ function initUploadHandlers() {
   if (cameraButton) {
     cameraButton.addEventListener("click", () => {
       openCameraCaptureModal();
-    });
-  }
-
-  if (liveButton) {
-    liveButton.addEventListener("click", () => {
-      openLiveDetectionModal();
     });
   }
 
@@ -377,8 +370,7 @@ function applyLayoutMode() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initSidebar();
-  applyLayoutMode();
-  window.addEventListener("resize", applyLayoutMode);
+  initLiveDetectionPage();
 
   loadModel("objectDetector").catch(() => {
     // Preload runs in background; errors surface when analysis runs.
