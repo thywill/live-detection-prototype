@@ -19,29 +19,44 @@
 
   <div class="app-layout">
     <aside id="sidebar" class="sidebar" aria-label="Live detection status">
-      <section class="sidebar__section">
-        <h2 class="sidebar__heading">Backend</h2>
-        <p class="live-stat" data-metric="backend">—</p>
-      </section>
-      <section class="sidebar__section">
-        <h2 class="sidebar__heading">Performance</h2>
-        <dl class="live-stat-list">
-          <div class="live-stat-row"><dt>Inference</dt><dd data-metric="instant">—</dd></div>
-          <div class="live-stat-row"><dt>Avg (30)</dt><dd data-metric="avg">—</dd></div>
-          <div class="live-stat-row"><dt>Effective FPS</dt><dd data-metric="fps">—</dd></div>
-          <div class="live-stat-row"><dt>Frames</dt><dd data-metric="frames">0</dd></div>
-        </dl>
-      </section>
-      <section class="sidebar__section">
-        <h2 class="sidebar__heading">GPS</h2>
-        <p class="live-stat live-stat--gps" data-metric="gps">—</p>
-      </section>
-      <section class="sidebar__section">
-        <h2 class="sidebar__heading">Log</h2>
-        <dl class="live-stat-list">
-          <div class="live-stat-row"><dt>Logged</dt><dd data-metric="logged">0</dd></div>
-        </dl>
-      </section>
+      <div class="live-sidebar-stack">
+        <section class="live-card">
+          <h2 class="live-card__label">Backend</h2>
+          <p class="live-card__backend" data-metric="backend">—</p>
+        </section>
+
+        <section class="live-card">
+          <h2 class="live-card__label">Performance</h2>
+          <dl class="live-card__rows">
+            <div class="live-card__row">
+              <dt>Inference</dt>
+              <dd data-metric="instant">—</dd>
+            </div>
+            <div class="live-card__row">
+              <dt>Avg (30)</dt>
+              <dd data-metric="avg">—</dd>
+            </div>
+            <div class="live-card__row">
+              <dt>Effective FPS</dt>
+              <dd data-metric="fps">—</dd>
+            </div>
+            <div class="live-card__row">
+              <dt>Frames</dt>
+              <dd data-metric="frames">0</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="live-card">
+          <h2 class="live-card__label">GPS</h2>
+          <p class="live-card__gps" data-metric="gps">—</p>
+        </section>
+
+        <section class="live-card live-card--logged">
+          <h2 class="live-card__label">Logged</h2>
+          <p class="live-card__logged-value" data-metric="logged">0</p>
+        </section>
+      </div>
     </aside>
 
     <main id="main-content" class="main-content">

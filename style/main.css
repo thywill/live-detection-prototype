@@ -13,6 +13,9 @@
   --color-text-subtle: #777777;
   --color-primary: #222222;
   --color-primary-hover: #333333;
+  --color-on-primary: #ffffff;
+  --color-btn-hover: #f0f0f0;
+  --color-btn-active: #e8e8e8;
   --color-toggle-off: #cccccc;
   --color-slider-track: #e0e0e0;
   --nav-height: 56px;
@@ -20,6 +23,31 @@
   --transition: 0.2s ease;
   --radius-sm: 4px;
   --radius-md: 8px;
+  --color-accent: #2563eb;
+  --color-danger: #b91c1c;
+  --color-danger-bg: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg-panel));
+  --color-danger-border: color-mix(in srgb, var(--color-danger) 22%, var(--color-border));
+  --live-card-radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-page: #121212;
+    --color-bg-panel: #1c1c1c;
+    --color-bg-sidebar: #161616;
+    --color-border: #2e2e2e;
+    --color-border-input: #3a3a3a;
+    --color-text: #f2f2f2;
+    --color-text-muted: #9a9a9a;
+    --color-text-subtle: #b0b0b0;
+    --color-primary: #f2f2f2;
+    --color-primary-hover: #ffffff;
+    --color-on-primary: #121212;
+    --color-btn-hover: #2a2a2a;
+    --color-btn-active: #333333;
+    --color-accent: #60a5fa;
+    --color-danger: #f87171;
+  }
 }
 
 *,
@@ -162,31 +190,34 @@ button {
 }
 
 .btn:hover {
-  background-color: #f0f0f0;
-  border-color: #ccc;
+  background-color: var(--color-btn-hover);
+  border-color: var(--color-border-input);
 }
 
 .btn:active {
-  background-color: #e8e8e8;
+  background-color: var(--color-btn-active);
 }
 
 .btn--primary {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: #ffffff;
+  color: var(--color-on-primary);
 }
 
 .btn--primary:hover {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
+  color: var(--color-on-primary);
 }
 
 .btn--primary:active {
-  background-color: #111111;
+  background-color: var(--color-primary-hover);
+  color: var(--color-on-primary);
 }
 
 .btn--secondary {
   background-color: var(--color-bg-panel);
+  color: var(--color-text);
 }
 
 .btn--text {
@@ -196,7 +227,7 @@ button {
 }
 
 .btn--text:hover {
-  background-color: #f0f0f0;
+  background-color: var(--color-btn-hover);
 }
 
 /* --------------------------------------------------------------------------
@@ -2484,39 +2515,85 @@ button {
    Full-page live detection layout
    -------------------------------------------------------------------------- */
 
-.live-stat {
-  font-size: 13px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.live-stat-list {
-  margin: 0;
-}
-
-.live-stat-row {
+.live-sidebar-stack {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
 }
 
-.live-stat-row + .live-stat-row {
-  margin-top: 6px;
+.live-card {
+  padding: 12px 14px;
+  background-color: var(--color-bg-panel);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--live-card-radius);
 }
 
-.live-stat-row dt {
+.live-card__label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
-.live-stat-row dd {
+.live-card__backend {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+  word-break: break-word;
+}
+
+.live-card__rows {
+  margin: 0;
+}
+
+.live-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.live-card__row + .live-card__row {
+  margin-top: 8px;
+}
+
+.live-card__row dt {
+  color: var(--color-text-subtle);
+}
+
+.live-card__row dd {
   margin: 0;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  color: var(--color-text);
 }
 
-.live-stat--gps {
-  line-height: 1.6;
+.live-card__gps {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-line;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+.live-card--logged {
+  background-color: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+}
+
+.live-card__logged-value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-danger);
 }
 
 .live-stage {

@@ -80,7 +80,7 @@ function formatGpsFix(fix) {
     fix.accuracy === null || fix.accuracy === undefined
       ? "—"
       : `±${Math.round(fix.accuracy)}m`;
-  return `${fix.lat.toFixed(8)}, ${fix.lon.toFixed(8)} ${accuracy}`;
+  return `${fix.lat.toFixed(8)}, ${fix.lon.toFixed(8)}\n${accuracy}`;
 }
 
 function computeInferenceSize(videoW, videoH) {
