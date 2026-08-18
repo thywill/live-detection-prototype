@@ -2,8 +2,19 @@
 // live-detection.js reads the resolved device/dtype via getObjectDetectorBackend().
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
-export const MODEL_ID = "Xenova/yolos-tiny";
+export const MODEL_OPTIONS = [
+  { id: "Xenova/yolos-tiny", label: "YOLOS-tiny (detection)", enabled: true },
+  { id: "Xenova/detr-resnet-50", label: "DETR (detection)", enabled: true },
+  { id: "classification:mobilenet", label: "MobileNet (classification)", enabled: false },
+  { id: "llm:scene-description", label: "LLM — scene description (coming soon)", enabled: false },
+];
+
+let MODEL_ID = "Xenova/yolos-tiny";
 const DTYPE = "auto";
+
+export function getModelId() {
+  return MODEL_ID;
+}
 
 let liveDetectionActive = false;
 
@@ -68,7 +79,9 @@ export async function getObjectDetectorBackend() {
 const MODEL_CONFIG = {
   objectDetector: {
     task: "object-detection",
-    model: MODEL_ID,
+    get model() {
+      return MODEL_ID;
+    },
   },
 };
 
@@ -117,20 +130,25 @@ export async function loadModel(modelName) {
     throw new Error(`Unknown model: ${modelName}`);
   }
 
+  const requestedModel = config.model;
+
   setModelStatus(modelName, "loading");
 
   const _tStart = performance.now();
-  console.log(`[TIMING] ${modelName}: loading started`);
+  console.log(`[TIMING] ${modelName}: loading started (${requestedModel})`);
 
   const device = await resolvedDevicePromise;
   const dtype = resolveDtypeForDevice(device);
   console.log(`[BACKEND] device=${device} dtype=${dtype}`);
 
-  loadingPromises[modelName] = pipeline(config.task, config.model, {
+  const loadPromise = pipeline(config.task, requestedModel, {
     device,
     dtype,
   })
     .then((instance) => {
+      if (config.model !== requestedModel) {
+        return models[modelName];
+      }
       models[modelName] = instance;
       setModelStatus(modelName, "ready");
       console.log(
@@ -139,12 +157,42 @@ export async function loadModel(modelName) {
       return instance;
     })
     .catch((error) => {
-      setModelStatus(modelName, "error");
+      if (config.model === requestedModel) {
+        setModelStatus(modelName, "error");
+      }
       throw error;
     })
     .finally(() => {
-      delete loadingPromises[modelName];
+      if (loadingPromises[modelName] === loadPromise) {
+        delete loadingPromises[modelName];
+      }
     });
 
-  return loadingPromises[modelName];
+  loadingPromises[modelName] = loadPromise;
+  return loadPromise;
+}
+
+// Drop the cached detector and reload through loadModel so device/dtype stay in one path.
+export async function setDetectionModel(modelId) {
+  const option = MODEL_OPTIONS.find((item) => item.id === modelId && item.enabled);
+  if (!option) {
+    throw new Error(`Unsupported detection model: ${modelId}`);
+  }
+  if (MODEL_ID === modelId && isModelReady("objectDetector")) {
+    return models.objectDetector;
+  }
+
+  const previousId = MODEL_ID;
+  MODEL_ID = modelId;
+  models.objectDetector = null;
+  setModelStatus("objectDetector", "idle");
+  delete loadingPromises.objectDetector;
+
+  try {
+    return await loadModel("objectDetector");
+  } catch (error) {
+    MODEL_ID = previousId;
+    await loadModel("objectDetector").catch(() => {});
+    throw error;
+  }
 }

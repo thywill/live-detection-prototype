@@ -3,9 +3,10 @@
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
 import {
+  getModelId,
   getObjectDetectorBackend,
   loadModel,
-  MODEL_ID,
+  setDetectionModel,
   setLiveDetectionActive,
 } from "../models.js";
 import { createGpsTracker } from "../utils/geolocation.js";
@@ -22,7 +23,7 @@ import {
   detectObjectsFromSource,
   renderBoundingBoxesOnContainer,
 } from "../analysis/objects.js";
-import { getSettings } from "./sidebar.js";
+import { getSettings, initModelPicker } from "./sidebar.js";
 
 const ROLLING_WINDOW = 30;
 // Cap the longest edge at 640px so full-resolution camera frames don't exhaust memory on mobile Safari.
@@ -166,6 +167,7 @@ export function initLiveDetectionPage() {
   let backendInfo = null;
   let running = false;
   let busy = false;
+  let switchingModel = false;
   let isRecording = false;
   let animationFrameId = null;
   let lastCompletedInferenceAt = 0;
@@ -230,7 +232,7 @@ export function initLiveDetectionPage() {
 
   async function tick() {
     // Single-in-flight: never start a new inference while one is running, so frames cannot pile up.
-    if (!running || busy) {
+    if (!running || busy || switchingModel) {
       return;
     }
     // Throttle from last *completed* inference, not last tick, so a slow frame still gets breathing room.
@@ -286,7 +288,7 @@ export function initLiveDetectionPage() {
           timestamp: Date.now(),
           gpsFix: gps?.getFix() ?? null,
           backend: backendInfo,
-          modelId: MODEL_ID,
+          modelId: getModelId(),
         });
       }
       updateMetricsPanel();
@@ -349,7 +351,7 @@ export function initLiveDetectionPage() {
   }
 
   function handleExport(exporter) {
-    const exportBackend = { ...(backendInfo ?? {}), model: MODEL_ID };
+    const exportBackend = { ...(backendInfo ?? {}), model: getModelId() };
     if (!exporter(exportBackend)) {
       showCameraFeedback("Nothing to export — start recording first");
     }
@@ -378,6 +380,35 @@ export function initLiveDetectionPage() {
   );
   window.addEventListener("pagehide", stopLiveDetection);
 
+  async function handleModelSelect(modelId) {
+    const select = document.getElementById("model-picker");
+    switchingModel = true;
+    if (select) {
+      select.disabled = true;
+    }
+    try {
+      while (busy) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      await setDetectionModel(modelId);
+      backendInfo = await getObjectDetectorBackend();
+      setMetric("backend", `${backendInfo.device} · ${backendInfo.dtype}`);
+      mediaWrap.querySelector(".bounding-boxes")?.remove();
+    } catch (error) {
+      console.error("[LIVE] model switch failed:", error);
+      showCameraFeedback("Could not load that model");
+      if (select) {
+        select.value = getModelId();
+      }
+    } finally {
+      switchingModel = false;
+      if (select) {
+        select.disabled = false;
+      }
+    }
+  }
+
+  initModelPicker(handleModelSelect);
   updateControls();
   updateMetricsPanel();
 }

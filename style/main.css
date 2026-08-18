@@ -80,7 +80,8 @@ ul {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -239,6 +240,29 @@ button {
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.model-picker {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--color-text);
+  background-color: var(--color-bg-page);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.model-picker:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.model-picker option:disabled {
   color: var(--color-text-muted);
 }
 
