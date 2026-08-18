@@ -1,3 +1,4 @@
+// Shared Blob download helper used by live CSV/JSON export.
 export function downloadFile(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);

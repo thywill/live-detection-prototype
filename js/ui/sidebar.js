@@ -1,5 +1,4 @@
-// Detection parameters for the live loop. The old analysis-settings UI is
-// gone; these are fixed defaults until live-specific controls are added.
+// Live-loop defaults (confidence / max objects). No settings UI yet; getSettings() is the seam for one later.
 const DEFAULT_PARAMETERS = {
   confidence: 0.5,
   maxObjects: 10,

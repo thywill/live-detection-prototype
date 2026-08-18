@@ -1,3 +1,4 @@
+// App entry: boots the live-detection page and preloads the object detector in the background.
 import { loadModel } from "./models.js";
 import { initLiveDetectionPage } from "./ui/live-detection.js";
 

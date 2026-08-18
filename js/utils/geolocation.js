@@ -1,3 +1,4 @@
+// Caches the latest GPS fix on an interval so detections can log location without blocking inference.
 // Lower GPS_REFRESH_MS for denser spatial data; costs battery.
 export const GPS_REFRESH_MS = 3000;
 

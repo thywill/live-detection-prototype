@@ -1,3 +1,5 @@
+// Loads the Transformers.js object-detection pipeline and chooses a backend (WebGPU or WASM).
+// live-detection.js reads the resolved device/dtype via getObjectDetectorBackend().
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
 export const MODEL_ID = "Xenova/yolos-tiny";
@@ -14,6 +16,7 @@ const DEFAULT_DTYPE_BY_DEVICE = {
   wasm: "q8",
 };
 
+// Use WebGPU whenever requestAdapter() returns an adapter; WASM only if GPU is missing, null, or throws.
 async function pickDevice() {
   if (!navigator.gpu) {
     console.log("[BACKEND] navigator.gpu missing → wasm");
@@ -46,9 +49,8 @@ async function pickDevice() {
 
 const resolvedDevicePromise = pickDevice();
 
+// fp16 is typically faster on WebGPU; q8 is the WASM default. Set DTYPE (not "auto") to force a precision for comparison.
 function resolveDtypeForDevice(device) {
-  // Keep this easy to override: set DTYPE to "q8"/"fp16"/"fp32" to force it.
-  // When DTYPE is "auto", prefer fp16 on WebGPU and q8 on WASM fallback.
   if (DTYPE !== "auto") {
     return DTYPE;
   }

@@ -1,4 +1,4 @@
-// caption is reserved for a future optional field (§6).
+// In-memory log: one row per detected object while recording is on. export-live.js reads this.
 
 const log = [];
 let sessionStart = null;
@@ -20,6 +20,7 @@ export function clearLiveDetectionLog() {
   sessionStart = Date.now();
 }
 
+// Pixel bbox matches the inference frame; bbox_norm (0–1) is resolution-independent for the later AR/3D stage.
 function normalizeBbox(box, frameW, frameH) {
   return {
     xmin: box.xmin / frameW,

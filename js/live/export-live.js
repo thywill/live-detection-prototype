@@ -1,3 +1,4 @@
+// Turns the in-memory detection log into a CSV or JSON download (via export.js).
 import { downloadFile } from "../utils/export.js";
 import {
   getLiveDetectionLog,

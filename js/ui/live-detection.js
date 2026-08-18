@@ -1,3 +1,5 @@
+// Live page: camera loop, stats, recording toggle, and export buttons.
+// Detection goes through objects.js / models.js; GPS and the log live in geolocation.js and detection-log.js.
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
 import {
@@ -23,8 +25,10 @@ import {
 import { getSettings } from "./sidebar.js";
 
 const ROLLING_WINDOW = 30;
+// Cap the longest edge at 640px so full-resolution camera frames don't exhaust memory on mobile Safari.
 const MAX_INFERENCE_EDGE = 640;
 
+// Coarse-pointer devices (iPad etc.) wait ~700ms between completed inferences so memory can release; desktop stays 0.
 function resolveInferenceIntervalMs() {
   const coarsePointer =
     typeof window.matchMedia === "function" &&
@@ -98,6 +102,7 @@ function computeInferenceSize(videoW, videoH) {
 function createPipelineInputHelper(ctx) {
   let rawImage = null;
 
+  // Transformers.js rejects a raw <canvas>; reuse one RawImage (JPEG data URL if RawImage is unavailable) to avoid per-frame allocations.
   return function canvasToPipelineInput(canvas) {
     if (typeof RawImage !== "function") {
       return canvas.toDataURL("image/jpeg", 0.85);
@@ -224,9 +229,11 @@ export function initLiveDetectionPage() {
   }
 
   async function tick() {
+    // Single-in-flight: never start a new inference while one is running, so frames cannot pile up.
     if (!running || busy) {
       return;
     }
+    // Throttle from last *completed* inference, not last tick, so a slow frame still gets breathing room.
     if (
       INFERENCE_INTERVAL_MS > 0 &&
       performance.now() - lastCompletedInferenceAt < INFERENCE_INTERVAL_MS

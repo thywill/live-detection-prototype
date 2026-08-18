@@ -1,3 +1,4 @@
+// Runs the object detector from models.js and draws label/confidence boxes on the live feed.
 import { loadModel, getModel } from "../models.js";
 
 const LABEL_COLORS = [
