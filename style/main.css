@@ -329,6 +329,7 @@ button {
    -------------------------------------------------------------------------- */
 
 .live-stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -382,6 +383,31 @@ button {
 .live-stage__idle-copy {
   margin-bottom: 6px;
   color: var(--color-text-subtle);
+}
+
+.live-stage__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--color-bg-page) 40%, transparent);
+}
+
+.live-stage__loading[hidden] {
+  display: none;
+}
+
+.live-stage__loading-label {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  background-color: var(--color-bg-panel);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--live-card-radius);
 }
 
 /* --------------------------------------------------------------------------

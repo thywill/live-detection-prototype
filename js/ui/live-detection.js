@@ -6,6 +6,7 @@ import {
   getModelId,
   getObjectDetectorBackend,
   loadModel,
+  MODEL_OPTIONS,
   setDetectionModel,
   setLiveDetectionActive,
 } from "../models.js";
@@ -75,6 +76,12 @@ function formatMetricMs(value) {
 
 function formatMetricFps(value) {
   return value === null ? "—" : value.toFixed(2);
+}
+
+function friendlyModelLabel(modelId) {
+  const label =
+    MODEL_OPTIONS.find((item) => item.id === modelId)?.label ?? modelId;
+  return label.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
 function formatGpsFix(fix) {
@@ -350,6 +357,20 @@ export function initLiveDetectionPage() {
     }
   }
 
+  function setModelLoading(modelId) {
+    const overlay = document.getElementById("model-loading");
+    const label = overlay?.querySelector(".live-stage__loading-label");
+    if (!overlay || !label) {
+      return;
+    }
+    if (modelId) {
+      label.textContent = `Loading ${friendlyModelLabel(modelId)}…`;
+      overlay.hidden = false;
+    } else {
+      overlay.hidden = true;
+    }
+  }
+
   function handleExport(exporter) {
     const exportBackend = { ...(backendInfo ?? {}), model: getModelId() };
     if (!exporter(exportBackend)) {
@@ -383,6 +404,7 @@ export function initLiveDetectionPage() {
   async function handleModelSelect(modelId) {
     const select = document.getElementById("model-picker");
     switchingModel = true;
+    setModelLoading(modelId);
     if (select) {
       select.disabled = true;
     }
@@ -402,6 +424,7 @@ export function initLiveDetectionPage() {
       }
     } finally {
       switchingModel = false;
+      setModelLoading(null);
       if (select) {
         select.disabled = false;
       }
