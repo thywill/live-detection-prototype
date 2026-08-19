@@ -3,7 +3,9 @@
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
 import {
+  getActiveSlot,
   getModelId,
+  getModelTask,
   getObjectDetectorBackend,
   loadModel,
   MODEL_OPTIONS,
@@ -24,6 +26,7 @@ import {
   detectObjectsFromSource,
   renderBoundingBoxesOnContainer,
 } from "../analysis/objects.js";
+import { classifyImageFromSource } from "../analysis/classify.js";
 import { getSettings, initModelPicker } from "./sidebar.js";
 
 const ROLLING_WINDOW = 30;
@@ -198,6 +201,26 @@ export function initLiveDetectionPage() {
     setMetric("logged", String(getLiveDetectionLogCount()));
   }
 
+  function renderClassificationReadout(predictions) {
+    const readout = document.getElementById("class-readout");
+    if (!readout) {
+      return;
+    }
+    if (!predictions?.length) {
+      readout.hidden = true;
+      readout.replaceChildren();
+      return;
+    }
+    readout.replaceChildren(
+      ...predictions.map((item) => {
+        const li = document.createElement("li");
+        li.textContent = `${item.label} — ${item.score.toFixed(2)}`;
+        return li;
+      }),
+    );
+    readout.hidden = false;
+  }
+
   function updateControls() {
     liveToggle.textContent = running
       ? "Stop Live Detection"
@@ -234,6 +257,7 @@ export function initLiveDetectionPage() {
     }
     stopStream();
     mediaWrap.querySelector(".bounding-boxes")?.remove();
+    renderClassificationReadout(null);
     updateControls();
   }
 
@@ -271,32 +295,60 @@ export function initLiveDetectionPage() {
 
     const { parameters } = getSettings();
     const t0 = performance.now();
+    const task = getModelTask();
+    const input = canvasToPipelineInput(frameCanvas);
 
     try {
-      const detections = await detectObjectsFromSource(
-        canvasToPipelineInput(frameCanvas),
-        {
+      if (task === "classification") {
+        const predictions = await classifyImageFromSource(input, { topK: 3 });
+        const inferenceMs = performance.now() - t0;
+        lastCompletedInferenceAt = performance.now();
+        console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
+        metrics.recordInferenceMs(inferenceMs);
+        mediaWrap.querySelector(".bounding-boxes")?.remove();
+        renderClassificationReadout(predictions);
+
+        if (isRecording) {
+          logDetectionFrame({
+            detections: predictions.map((item) => ({
+              label: item.label,
+              score: item.score,
+              rank: item.rank,
+              box: null,
+            })),
+            frameW,
+            frameH,
+            inferenceMs,
+            timestamp: Date.now(),
+            gpsFix: gps?.getFix() ?? null,
+            backend: backendInfo,
+            modelId: getModelId(),
+          });
+        }
+      } else {
+        const detections = await detectObjectsFromSource(input, {
           threshold: parameters.confidence,
           maxObjects: parameters.maxObjects,
-        },
-      );
-      const inferenceMs = performance.now() - t0;
-      lastCompletedInferenceAt = performance.now();
-      console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
-      metrics.recordInferenceMs(inferenceMs);
-      renderBoundingBoxesOnContainer(mediaWrap, detections, frameCanvas);
-
-      if (isRecording) {
-        logDetectionFrame({
-          detections,
-          frameW,
-          frameH,
-          inferenceMs,
-          timestamp: Date.now(),
-          gpsFix: gps?.getFix() ?? null,
-          backend: backendInfo,
-          modelId: getModelId(),
         });
+        const inferenceMs = performance.now() - t0;
+        lastCompletedInferenceAt = performance.now();
+        console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
+        metrics.recordInferenceMs(inferenceMs);
+        renderClassificationReadout(null);
+        renderBoundingBoxesOnContainer(mediaWrap, detections, frameCanvas);
+
+        if (isRecording) {
+          logDetectionFrame({
+            detections,
+            frameW,
+            frameH,
+            inferenceMs,
+            timestamp: Date.now(),
+            gpsFix: gps?.getFix() ?? null,
+            backend: backendInfo,
+            modelId: getModelId(),
+          });
+        }
       }
       updateMetricsPanel();
     } catch (error) {
@@ -324,7 +376,7 @@ export function initLiveDetectionPage() {
     try {
       stream = await requestCameraStream();
       setLiveDetectionActive(true);
-      await loadModel("objectDetector");
+      await loadModel(getActiveSlot());
       backendInfo = await getObjectDetectorBackend();
       setMetric("backend", `${backendInfo.device} · ${backendInfo.dtype}`);
 
@@ -416,6 +468,7 @@ export function initLiveDetectionPage() {
       backendInfo = await getObjectDetectorBackend();
       setMetric("backend", `${backendInfo.device} · ${backendInfo.dtype}`);
       mediaWrap.querySelector(".bounding-boxes")?.remove();
+      renderClassificationReadout(null);
     } catch (error) {
       console.error("[LIVE] model switch failed:", error);
       showCameraFeedback("Could not load that model");

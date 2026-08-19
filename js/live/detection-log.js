@@ -41,13 +41,7 @@ export function logDetectionFrame({
   modelId,
 }) {
   for (const detection of detections) {
-    const bbox = {
-      xmin: detection.box.xmin,
-      ymin: detection.box.ymin,
-      xmax: detection.box.xmax,
-      ymax: detection.box.ymax,
-    };
-
+    const hasBox = detection.box != null;
     log.push({
       timestamp,
       lat: gpsFix?.lat ?? null,
@@ -59,8 +53,18 @@ export function logDetectionFrame({
       device: backend.device,
       label: detection.label,
       confidence: detection.score,
-      bbox,
-      bbox_norm: normalizeBbox(bbox, frameW, frameH),
+      rank: detection.rank ?? null,
+      bbox: hasBox
+        ? {
+            xmin: detection.box.xmin,
+            ymin: detection.box.ymin,
+            xmax: detection.box.xmax,
+            ymax: detection.box.ymax,
+          }
+        : null,
+      bbox_norm: hasBox
+        ? normalizeBbox(detection.box, frameW, frameH)
+        : null,
       frame_w: frameW,
       frame_h: frameH,
       inference_ms: inferenceMs,

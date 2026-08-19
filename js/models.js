@@ -1,12 +1,12 @@
-// Loads the Transformers.js object-detection pipeline and chooses a backend (WebGPU or WASM).
+// Loads Transformers.js pipelines (object-detection or image-classification) and chooses WebGPU or WASM.
 // live-detection.js reads the resolved device/dtype via getObjectDetectorBackend().
 import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 
 export const MODEL_OPTIONS = [
-  { id: "Xenova/yolos-tiny", label: "YOLOS-tiny (detection)", enabled: true },
-  { id: "Xenova/detr-resnet-50", label: "DETR (detection)", enabled: true },
-  { id: "classification:mobilenet", label: "MobileNet (classification)", enabled: false },
-  { id: "llm:scene-description", label: "LLM — scene description (coming soon)", enabled: false },
+  { id: "Xenova/yolos-tiny", label: "YOLOS-tiny (detection)", task: "detection", enabled: true },
+  { id: "Xenova/detr-resnet-50", label: "DETR (detection)", task: "detection", enabled: true },
+  { id: "Xenova/mobilenet_v2_1.0_224", label: "MobileNet (classification)", task: "classification", enabled: true },
+  { id: "llm:scene-description", label: "LLM — scene description (coming soon)", task: "llm", enabled: false },
 ];
 
 let MODEL_ID = "Xenova/yolos-tiny";
@@ -14,6 +14,14 @@ const DTYPE = "auto";
 
 export function getModelId() {
   return MODEL_ID;
+}
+
+export function getModelTask() {
+  return MODEL_OPTIONS.find((item) => item.id === MODEL_ID)?.task ?? "detection";
+}
+
+export function getActiveSlot() {
+  return getModelTask() === "classification" ? "classifier" : "objectDetector";
 }
 
 let liveDetectionActive = false;
@@ -83,14 +91,22 @@ const MODEL_CONFIG = {
       return MODEL_ID;
     },
   },
+  classifier: {
+    task: "image-classification",
+    get model() {
+      return MODEL_ID;
+    },
+  },
 };
 
 const models = {
   objectDetector: null,
+  classifier: null,
 };
 
 export const modelStatus = {
   objectDetector: "idle",
+  classifier: "idle",
 };
 
 const loadingPromises = {};
@@ -172,27 +188,32 @@ export async function loadModel(modelName) {
   return loadPromise;
 }
 
-// Drop the cached detector and reload through loadModel so device/dtype stay in one path.
+// Drop the cached pipeline and reload through loadModel so device/dtype stay in one path.
 export async function setDetectionModel(modelId) {
   const option = MODEL_OPTIONS.find((item) => item.id === modelId && item.enabled);
-  if (!option) {
-    throw new Error(`Unsupported detection model: ${modelId}`);
+  if (!option || (option.task !== "detection" && option.task !== "classification")) {
+    throw new Error(`Unsupported model: ${modelId}`);
   }
-  if (MODEL_ID === modelId && isModelReady("objectDetector")) {
-    return models.objectDetector;
+
+  const slot = option.task === "classification" ? "classifier" : "objectDetector";
+  if (MODEL_ID === modelId && isModelReady(slot)) {
+    return models[slot];
   }
 
   const previousId = MODEL_ID;
   MODEL_ID = modelId;
   models.objectDetector = null;
+  models.classifier = null;
   setModelStatus("objectDetector", "idle");
+  setModelStatus("classifier", "idle");
   delete loadingPromises.objectDetector;
+  delete loadingPromises.classifier;
 
   try {
-    return await loadModel("objectDetector");
+    return await loadModel(slot);
   } catch (error) {
     MODEL_ID = previousId;
-    await loadModel("objectDetector").catch(() => {});
+    await loadModel(getActiveSlot()).catch(() => {});
     throw error;
   }
 }
