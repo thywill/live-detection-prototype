@@ -149,8 +149,8 @@ export function initLiveDetectionPage() {
   const liveToggle = document.getElementById("btn-live-toggle");
   const mainStart = document.getElementById("btn-live-start-main");
   const recordButton = document.getElementById("btn-record");
-  const exportCsvButton = document.getElementById("btn-export-csv");
-  const exportJsonButton = document.getElementById("btn-export-json");
+  const exportButton = document.getElementById("btn-export");
+  const exportMenu = document.getElementById("export-menu");
 
   if (
     !video ||
@@ -160,8 +160,8 @@ export function initLiveDetectionPage() {
     !liveToggle ||
     !mainStart ||
     !recordButton ||
-    !exportCsvButton ||
-    !exportJsonButton
+    !exportButton ||
+    !exportMenu
   ) {
     return;
   }
@@ -430,6 +430,21 @@ export function initLiveDetectionPage() {
     }
   }
 
+  function closeExportMenu() {
+    exportMenu.hidden = true;
+    exportButton.setAttribute("aria-expanded", "false");
+  }
+
+  function openExportMenu() {
+    exportMenu.hidden = false;
+    const rect = exportButton.getBoundingClientRect();
+    const menuWidth = exportMenu.offsetWidth;
+    const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+    exportMenu.style.top = `${rect.bottom + 6}px`;
+    exportMenu.style.left = `${left}px`;
+    exportButton.setAttribute("aria-expanded", "true");
+  }
+
   liveToggle.addEventListener("click", () => {
     if (running) {
       stopLiveDetection();
@@ -445,12 +460,43 @@ export function initLiveDetectionPage() {
     isRecording = !isRecording;
     updateControls();
   });
-  exportCsvButton.addEventListener("click", () =>
-    handleExport(exportLiveDetectionCsv),
-  );
-  exportJsonButton.addEventListener("click", () =>
-    handleExport(exportLiveDetectionJson),
-  );
+  exportButton.addEventListener("click", () => {
+    if (exportMenu.hidden) {
+      openExportMenu();
+    } else {
+      closeExportMenu();
+    }
+  });
+  exportMenu.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-export]");
+    if (!item) {
+      return;
+    }
+    const exporter =
+      item.dataset.export === "json"
+        ? exportLiveDetectionJson
+        : exportLiveDetectionCsv;
+    closeExportMenu();
+    handleExport(exporter);
+  });
+  document.addEventListener("click", (event) => {
+    if (exportMenu.hidden) {
+      return;
+    }
+    if (
+      exportButton.contains(event.target) ||
+      exportMenu.contains(event.target)
+    ) {
+      return;
+    }
+    closeExportMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !exportMenu.hidden) {
+      closeExportMenu();
+      exportButton.focus();
+    }
+  });
   window.addEventListener("pagehide", stopLiveDetection);
 
   async function handleModelSelect(modelId) {

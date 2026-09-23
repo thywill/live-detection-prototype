@@ -12,8 +12,14 @@
     <nav class="top-nav__actions" aria-label="Live detection controls">
       <button type="button" id="btn-live-toggle" class="btn btn--primary" aria-pressed="false">Start Live Detection</button>
       <button type="button" id="btn-record" class="btn btn--secondary" aria-pressed="false">Start Recording</button>
-      <button type="button" id="btn-export-csv" class="btn btn--secondary">Export CSV</button>
-      <button type="button" id="btn-export-json" class="btn btn--secondary">Export JSON</button>
+      <div class="export-menu">
+        <button type="button" id="btn-export" class="btn btn--secondary export-menu__trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu">Export</button>
+        <div id="export-menu" class="export-menu__list" role="menu" hidden>
+          <button type="button" class="export-menu__item" role="menuitem" data-export="csv">CSV</button>
+          <button type="button" class="export-menu__item" role="menuitem" data-export="json">JSON</button>
+        </div>
+      </div>
+      <button type="button" id="btn-summary" class="btn btn--secondary" aria-pressed="false">Summary</button>
     </nav>
   </header>
 
@@ -81,6 +87,49 @@
           <p class="live-stage__loading-label">Loading…</p>
         </div>
       </div>
+
+      <section id="session-summary" class="session-summary hidden" aria-labelledby="session-summary-title">
+        <div class="session-summary__header">
+          <h2 id="session-summary-title" class="session-summary__title">Session summary</h2>
+          <button type="button" id="btn-summary-close" class="btn btn--secondary">Back to live</button>
+        </div>
+
+        <p id="summary-empty" class="session-summary__empty hidden">No data yet — record a session first</p>
+
+        <div id="summary-content" class="session-summary__content hidden">
+          <div class="summary-metrics">
+            <section class="live-card summary-metric">
+              <h2 class="live-card__label">Detections</h2>
+              <p class="summary-metric__value" data-summary="detections">0</p>
+            </section>
+            <section class="live-card summary-metric">
+              <h2 class="live-card__label">Frames</h2>
+              <p class="summary-metric__value" data-summary="frames">0</p>
+            </section>
+            <section class="live-card summary-metric">
+              <h2 class="live-card__label">Avg confidence</h2>
+              <p class="summary-metric__value" data-summary="confidence">0.00</p>
+            </section>
+            <section class="live-card summary-metric">
+              <h2 class="live-card__label">Duration</h2>
+              <p class="summary-metric__value" data-summary="duration">00:00</p>
+            </section>
+          </div>
+
+          <section class="live-card">
+            <h2 class="live-card__label">Summary</h2>
+            <p id="summary-text" class="summary-text"></p>
+          </section>
+
+          <section class="live-card">
+            <h2 class="live-card__label">Top labels</h2>
+            <div class="summary-chart">
+              <canvas id="summary-labels-chart" role="img" aria-label="Most frequent detection labels"></canvas>
+            </div>
+            <p id="summary-chart-note" class="summary-chart-note hidden"></p>
+          </section>
+        </div>
+      </section>
     </main>
   </div>
 

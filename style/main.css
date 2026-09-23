@@ -181,6 +181,47 @@ button {
   border-color: #c0392b;
 }
 
+.export-menu__trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  margin-bottom: 3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.export-menu__list {
+  position: fixed;
+  z-index: 200;
+  min-width: 140px;
+  margin: 0;
+  padding: 4px;
+  background-color: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.export-menu__list[hidden] {
+  display: none;
+}
+
+.export-menu__item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.export-menu__item:hover,
+.export-menu__item:focus-visible {
+  background-color: var(--color-btn-hover);
+}
+
 /* --------------------------------------------------------------------------
    App layout
    -------------------------------------------------------------------------- */
@@ -206,6 +247,7 @@ button {
 .main-content {
   margin-left: var(--sidebar-width);
   margin-top: var(--nav-height);
+  position: relative;
   min-height: calc(100vh - var(--nav-height));
   height: calc(100vh - var(--nav-height));
   padding: 16px;
@@ -432,6 +474,85 @@ button {
 }
 
 /* --------------------------------------------------------------------------
+   Session summary (on-demand snapshot of the detection log)
+   -------------------------------------------------------------------------- */
+
+#btn-summary[aria-pressed="true"] {
+  background-color: var(--color-btn-active);
+}
+
+.session-summary {
+  position: absolute;
+  z-index: 5;
+  inset: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  background-color: var(--color-bg-page);
+}
+
+.session-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-summary__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.session-summary__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 16px;
+  text-align: center;
+  color: var(--color-text-subtle);
+}
+
+.session-summary__content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-metric__value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.summary-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.summary-chart {
+  position: relative;
+  height: 280px;
+}
+
+.summary-chart-note {
+  margin: 8px 0 0;
+  color: var(--color-text-subtle);
+}
+
+/* --------------------------------------------------------------------------
    Detection bounding boxes
    -------------------------------------------------------------------------- */
 
@@ -514,5 +635,13 @@ button {
 
   .btn {
     min-height: 44px;
+  }
+
+  .export-menu__item {
+    min-height: 44px;
+  }
+
+  .summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
