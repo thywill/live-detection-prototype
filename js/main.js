@@ -2,10 +2,12 @@
 import { loadModel } from "./models.js";
 import { initLiveDetectionPage } from "./ui/live-detection.js";
 import { initSessionSummary } from "./ui/session-summary.js";
+import { initSessionMap } from "./ui/session-map.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   initLiveDetectionPage();
   initSessionSummary();
+  initSessionMap();
 
   loadModel("objectDetector").catch(() => {
     // Preload runs in background; errors surface when live detection starts.

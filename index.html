@@ -20,6 +20,7 @@
         </div>
       </div>
       <button type="button" id="btn-summary" class="btn btn--secondary" aria-pressed="false">Summary</button>
+      <button type="button" id="btn-map" class="btn btn--secondary" aria-pressed="false">Map</button>
     </nav>
   </header>
 
@@ -129,6 +130,17 @@
             <p id="summary-chart-note" class="summary-chart-note hidden"></p>
           </section>
         </div>
+      </section>
+
+      <section id="session-map" class="session-map hidden" aria-labelledby="session-map-title">
+        <div class="session-map__header">
+          <h2 id="session-map-title" class="session-map__title">Session map</h2>
+          <button type="button" id="btn-map-close" class="btn btn--secondary">Back to live</button>
+        </div>
+
+        <p id="map-empty" class="session-map__empty hidden">No location data yet — record a session with GPS first</p>
+        <p id="map-error" class="session-map__empty hidden">The map could not be loaded.</p>
+        <div id="map-canvas" class="session-map__canvas hidden" role="region" aria-label="Map of the walked path"></div>
       </section>
     </main>
   </div>

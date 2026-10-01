@@ -553,6 +553,75 @@ button {
 }
 
 /* --------------------------------------------------------------------------
+   Session map (on-demand snapshot of the walked GPS path)
+   -------------------------------------------------------------------------- */
+
+#btn-map[aria-pressed="true"] {
+  background-color: var(--color-btn-active);
+}
+
+.session-map {
+  position: absolute;
+  z-index: 5;
+  inset: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: var(--color-bg-page);
+}
+
+.session-map__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-map__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.session-map__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 16px;
+  text-align: center;
+  color: var(--color-text-subtle);
+}
+
+.session-map__canvas {
+  flex: 1;
+  min-height: 320px;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--live-card-radius);
+  overflow: hidden;
+  background-color: var(--color-bg-panel);
+}
+
+.session-map__canvas .leaflet-control-attribution {
+  color: var(--color-text-subtle);
+  background-color: color-mix(in srgb, var(--color-bg-panel) 85%, transparent);
+}
+
+.session-map__canvas .leaflet-control-attribution a {
+  color: var(--color-accent);
+}
+
+.session-map__canvas .leaflet-bar a {
+  color: var(--color-text);
+  background-color: var(--color-bg-panel);
+  border-bottom-color: var(--color-border);
+}
+
+.session-map__canvas .leaflet-bar a:hover {
+  background-color: var(--color-btn-hover);
+}
+
+/* --------------------------------------------------------------------------
    Detection bounding boxes
    -------------------------------------------------------------------------- */
 
