@@ -99,14 +99,22 @@ function formatGpsFix(fix) {
   return `${fix.lat.toFixed(8)}, ${fix.lon.toFixed(8)}\n${accuracy}`;
 }
 
+// TEMPORARY field-test display: corrected camera heading, plus the raw inputs it came from.
 function formatHeading(reading) {
   if (reading?.heading == null) {
-    return "No compass";
+    return { main: "No compass", detail: "" };
   }
-  const heading = `${Math.round(reading.heading) % 360}°`;
-  return reading.accuracy == null
-    ? heading
-    : `${heading} (±${Math.round(reading.accuracy)}°)`;
+  const degrees = (value) => `${Math.round(value) % 360}°`;
+  const camera =
+    reading.cameraHeading == null ? "—" : degrees(reading.cameraHeading);
+  const accuracy =
+    reading.accuracy == null ? "" : ` (±${Math.round(reading.accuracy)}°)`;
+  const screenAngle =
+    reading.screenAngle == null ? "—" : `${reading.screenAngle}°`;
+  return {
+    main: `${camera}${accuracy}`,
+    detail: `raw ${degrees(reading.heading)}, screen ${screenAngle}`,
+  };
 }
 
 function computeInferenceSize(videoW, videoH) {
@@ -202,6 +210,16 @@ export function initLiveDetectionPage() {
     if (target) {
       target.textContent = value;
     }
+  }
+
+  function setHeading({ main, detail }) {
+    const text = `${main}\n${detail}`;
+    if (text === headingText) {
+      return;
+    }
+    headingText = text;
+    setMetric("heading", main);
+    setMetric("heading-detail", detail);
   }
 
   function updateMetricsPanel() {
@@ -412,8 +430,8 @@ export function initLiveDetectionPage() {
       });
       gps.start();
 
-      headingText = "No compass";
-      setMetric("heading", headingText);
+      headingText = null;
+      setHeading(formatHeading(null));
 
       video.srcObject = stream;
       await video.play();
@@ -423,13 +441,9 @@ export function initLiveDetectionPage() {
         if (state !== "granted" || !running || compass) {
           return;
         }
-        compass = createCompassTracker((reading) => {
-          const text = formatHeading(reading);
-          if (text !== headingText) {
-            headingText = text;
-            setMetric("heading", text);
-          }
-        });
+        compass = createCompassTracker((reading) =>
+          setHeading(formatHeading(reading)),
+        );
         compass.start();
       });
       console.log(`[LIVE] INFERENCE_INTERVAL_MS=${INFERENCE_INTERVAL_MS}`);
