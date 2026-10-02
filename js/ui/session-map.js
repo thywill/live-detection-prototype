@@ -1,4 +1,4 @@
-// On-demand map of the walked GPS path from the in-memory detection log. Read-only.
+// On-demand map of the walked GPS path and detections from the in-memory detection log. Read-only.
 import { getLiveDetectionLog } from "../live/detection-log.js";
 
 const LEAFLET_CSS =
@@ -9,6 +9,43 @@ const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 const SINGLE_POINT_ZOOM = 18;
+// All label colors avoid the path blue and the start green / end red.
+const FIXED_LABEL_COLORS = new Map([
+  ["person", "#f59e0b"],
+  ["bench", "#8b5cf6"],
+  ["tree", "#a16207"],
+  ["car", "#ec4899"],
+  ["bicycle", "#06b6d4"],
+  ["dog", "#d946ef"],
+  ["potted plant", "#14b8a6"],
+  ["traffic light", "#334155"],
+]);
+// Hash fallback for every other label. None of these repeat a fixed color.
+const LABEL_PALETTE = [
+  "#fde047",
+  "#ca8a04",
+  "#f97316",
+  "#c2410c",
+  "#fdba74",
+  "#f9a8d4",
+  "#9d174d",
+  "#fb7185",
+  "#c4b5fd",
+  "#5b21b6",
+  "#e879f9",
+  "#86198f",
+  "#67e8f9",
+  "#0e7490",
+  "#5eead4",
+  "#115e59",
+  "#78716c",
+  "#94a3b8",
+  "#1c1917",
+  "#78350f",
+];
+const LEGEND_LIMIT = 8;
+// 5 decimal places is ~1 m, finer than phone GPS accuracy.
+const DEDUPE_DECIMALS = 5;
 
 let map = null;
 let leafletLoader = null;
@@ -103,6 +140,71 @@ function extractPath(rows) {
   return path;
 }
 
+// Fixed colors first, then FNV-1a over the label name, so a label keeps its color across sessions.
+function labelColor(label) {
+  const fixed = FIXED_LABEL_COLORS.get(label.toLowerCase());
+  if (fixed) {
+    return fixed;
+  }
+
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < label.length; i += 1) {
+    hash ^= label.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return LABEL_PALETTE[(hash >>> 0) % LABEL_PALETTE.length];
+}
+
+function extractDetectionPoints(rows) {
+  const points = new Map();
+  const labelCounts = new Map();
+
+  for (const row of rows) {
+    if (row.lat == null || row.lon == null) {
+      continue;
+    }
+    const lat = Number(row.lat);
+    const lon = Number(row.lon);
+    const label = typeof row.label === "string" ? row.label.trim() : "";
+    if (!isValidCoordinate(lat, lon) || !label) {
+      continue;
+    }
+
+    labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+
+    const key = `${lat.toFixed(DEDUPE_DECIMALS)},${lon.toFixed(DEDUPE_DECIMALS)},${label}`;
+    const confidence = Number(row.confidence);
+    const existing = points.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (Number.isFinite(confidence) && !(confidence <= existing.confidence)) {
+        existing.confidence = confidence;
+      }
+      continue;
+    }
+    points.set(key, {
+      lat,
+      lon,
+      label,
+      confidence: Number.isFinite(confidence) ? confidence : null,
+      count: 1,
+    });
+  }
+
+  const labels = [...labelCounts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const colors = new Map(labels.map((item) => [item.label, labelColor(item.label)]));
+  const rank = new Map(labels.map((item, index) => [item.label, index]));
+
+  // Most frequent labels are drawn first so rarer labels sit on top and stay clickable.
+  const dots = [...points.values()].sort(
+    (a, b) => rank.get(a.label) - rank.get(b.label),
+  );
+
+  return { dots, labels, colors };
+}
+
 function themeColor(name, fallback) {
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue(name)
@@ -115,7 +217,80 @@ function destroyMap() {
   map = null;
 }
 
-function drawMap(L, container, path) {
+function detectionPopup(dot) {
+  const content = document.createElement("div");
+  const title = document.createElement("p");
+  title.className = "map-popup__title";
+  const confidence =
+    dot.confidence === null ? "—" : dot.confidence.toFixed(2);
+  title.textContent = `${dot.label} — ${confidence}`;
+  content.appendChild(title);
+
+  if (dot.count > 1) {
+    const note = document.createElement("p");
+    note.className = "map-popup__note";
+    note.textContent = `Highest of ${dot.count} detections here`;
+    content.appendChild(note);
+  }
+  return content;
+}
+
+function drawDetections(L, detections, panel) {
+  for (const dot of detections.dots) {
+    L.circleMarker([dot.lat, dot.lon], {
+      radius: 5,
+      color: panel,
+      weight: 1,
+      fillColor: detections.colors.get(dot.label),
+      fillOpacity: 0.9,
+    })
+      .bindPopup(detectionPopup(dot))
+      .addTo(map);
+  }
+}
+
+// Rendered below the map rather than as a Leaflet control: controls always stack above popups.
+function renderLegend(legend, detections) {
+  legend.replaceChildren();
+  legend.classList.toggle("hidden", detections.labels.length === 0);
+  if (!detections.labels.length) {
+    return;
+  }
+
+  const heading = document.createElement("p");
+  heading.className = "map-legend__title";
+  heading.textContent = "Labels";
+
+  const list = document.createElement("ul");
+  list.className = "map-legend__list";
+  for (const item of detections.labels.slice(0, LEGEND_LIMIT)) {
+    const row = document.createElement("li");
+    row.className = "map-legend__item";
+    const swatch = document.createElement("span");
+    swatch.className = "map-legend__swatch";
+    swatch.style.backgroundColor = detections.colors.get(item.label);
+    const name = document.createElement("span");
+    name.className = "map-legend__label";
+    name.textContent = item.label;
+    const count = document.createElement("span");
+    count.className = "map-legend__count";
+    count.textContent = String(item.count);
+    row.append(swatch, name, count);
+    list.appendChild(row);
+  }
+
+  legend.append(heading, list);
+
+  const hidden = detections.labels.length - LEGEND_LIMIT;
+  if (hidden > 0) {
+    const more = document.createElement("p");
+    more.className = "map-legend__more";
+    more.textContent = `+${hidden} more ${hidden === 1 ? "label" : "labels"}`;
+    legend.appendChild(more);
+  }
+}
+
+function drawMap(L, container, path, detections) {
   destroyMap();
   map = L.map(container, { zoomControl: true });
   L.tileLayer(TILE_URL, {
@@ -135,6 +310,8 @@ function drawMap(L, container, path) {
   } else {
     map.setView(start, SINGLE_POINT_ZOOM);
   }
+
+  drawDetections(L, detections, panel);
 
   L.circleMarker(start, {
     radius: 7,
@@ -166,10 +343,24 @@ export function initSessionMap() {
   const empty = document.getElementById("map-empty");
   const errorNote = document.getElementById("map-error");
   const canvas = document.getElementById("map-canvas");
+  const legend = document.getElementById("map-legend");
   const summaryButton = document.getElementById("btn-summary");
 
-  if (!button || !panel || !closeButton || !empty || !errorNote || !canvas) {
+  if (
+    !button ||
+    !panel ||
+    !closeButton ||
+    !empty ||
+    !errorNote ||
+    !canvas ||
+    !legend
+  ) {
     return;
+  }
+
+  function clearLegend() {
+    legend.replaceChildren();
+    legend.classList.add("hidden");
   }
 
   function isOpen() {
@@ -179,6 +370,7 @@ export function initSessionMap() {
   function closeMap({ restoreFocus = true } = {}) {
     openGeneration += 1;
     destroyMap();
+    clearLegend();
     panel.classList.add("hidden");
     button.setAttribute("aria-pressed", "false");
     if (restoreFocus) {
@@ -192,10 +384,13 @@ export function initSessionMap() {
       summaryButton.click();
     }
 
-    const path = extractPath(getLiveDetectionLog().slice());
+    const rows = getLiveDetectionLog().slice();
+    const path = extractPath(rows);
+    const detections = extractDetectionPoints(rows);
     button.setAttribute("aria-pressed", "true");
     panel.classList.remove("hidden");
     errorNote.classList.add("hidden");
+    clearLegend();
 
     const hasPath = path.length > 0;
     empty.classList.toggle("hidden", hasPath);
@@ -211,7 +406,8 @@ export function initSessionMap() {
       if (generation !== openGeneration || !L) {
         return;
       }
-      drawMap(L, canvas, path);
+      drawMap(L, canvas, path, detections);
+      renderLegend(legend, detections);
     } catch (error) {
       console.error("[MAP] map failed:", error);
       if (generation !== openGeneration) {
