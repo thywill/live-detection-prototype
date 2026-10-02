@@ -6,7 +6,7 @@ In-browser live object detection. Camera, model, and log all stay on the device.
 camera (getUserMedia)
   → detect  (models.js loads Transformers.js; objects.js runs the pipeline and draws boxes)
   → stats   (live-detection.js updates the sidebar)
-  → record  (detection-log.js: one row per object + GPS from geolocation.js)
+  → record  (detection-log.js: one row per object + GPS from geolocation.js + heading/tilt from compass.js)
   → export  (export-live.js → CSV / JSON via export.js)
 ```
 

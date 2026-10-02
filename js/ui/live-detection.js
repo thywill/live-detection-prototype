@@ -1,5 +1,5 @@
 // Live page: camera loop, stats, recording toggle, and export buttons.
-// Detection goes through objects.js / models.js; GPS and the log live in geolocation.js and detection-log.js.
+// Detection goes through objects.js / models.js; GPS, compass, and the log live in geolocation.js, compass.js, and detection-log.js.
 import { RawImage } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.1";
 import { requestCameraStream, showCameraFeedback } from "../utils/camera.js";
 import {
@@ -13,6 +13,7 @@ import {
   setLiveDetectionActive,
 } from "../models.js";
 import { createGpsTracker } from "../utils/geolocation.js";
+import { createCompassTracker, requestCompassPermission } from "../utils/compass.js";
 import {
   clearLiveDetectionLog,
   getLiveDetectionLogCount,
@@ -98,6 +99,16 @@ function formatGpsFix(fix) {
   return `${fix.lat.toFixed(8)}, ${fix.lon.toFixed(8)}\n${accuracy}`;
 }
 
+function formatHeading(reading) {
+  if (reading?.heading == null) {
+    return "No compass";
+  }
+  const heading = `${Math.round(reading.heading) % 360}°`;
+  return reading.accuracy == null
+    ? heading
+    : `${heading} (±${Math.round(reading.accuracy)}°)`;
+}
+
 function computeInferenceSize(videoW, videoH) {
   const longest = Math.max(videoW, videoH);
   if (longest <= MAX_INFERENCE_EDGE) {
@@ -174,6 +185,8 @@ export function initLiveDetectionPage() {
   let stream = null;
   let gps = null;
   let gpsFix = null;
+  let compass = null;
+  let headingText = null;
   let backendInfo = null;
   let running = false;
   let busy = false;
@@ -251,6 +264,8 @@ export function initLiveDetectionPage() {
     setLiveDetectionActive(false);
     gps?.stop();
     gps = null;
+    compass?.stop();
+    compass = null;
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
@@ -292,6 +307,8 @@ export function initLiveDetectionPage() {
     frameH = sized.height;
     busy = true;
     frameCtx.drawImage(video, 0, 0, frameW, frameH);
+    // Captured with the frame, not after inference: heading changes faster than GPS.
+    const orientation = compass?.getReading() ?? null;
 
     const { parameters } = getSettings();
     const t0 = performance.now();
@@ -321,6 +338,7 @@ export function initLiveDetectionPage() {
             inferenceMs,
             timestamp: Date.now(),
             gpsFix: gps?.getFix() ?? null,
+            orientation,
             backend: backendInfo,
             modelId: getModelId(),
           });
@@ -345,6 +363,7 @@ export function initLiveDetectionPage() {
             inferenceMs,
             timestamp: Date.now(),
             gpsFix: gps?.getFix() ?? null,
+            orientation,
             backend: backendInfo,
             modelId: getModelId(),
           });
@@ -370,6 +389,7 @@ export function initLiveDetectionPage() {
     if (running) {
       return;
     }
+    const compassPermission = requestCompassPermission();
 
     liveToggle.disabled = true;
     mainStart.disabled = true;
@@ -392,10 +412,26 @@ export function initLiveDetectionPage() {
       });
       gps.start();
 
+      headingText = "No compass";
+      setMetric("heading", headingText);
+
       video.srcObject = stream;
       await video.play();
       running = true;
       updateControls();
+      compassPermission.then((state) => {
+        if (state !== "granted" || !running || compass) {
+          return;
+        }
+        compass = createCompassTracker((reading) => {
+          const text = formatHeading(reading);
+          if (text !== headingText) {
+            headingText = text;
+            setMetric("heading", text);
+          }
+        });
+        compass.start();
+      });
       console.log(`[LIVE] INFERENCE_INTERVAL_MS=${INFERENCE_INTERVAL_MS}`);
       loop();
     } catch (error) {
