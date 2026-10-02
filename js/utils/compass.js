@@ -59,7 +59,9 @@ export function createCompassTracker(onReading) {
   function handleOrientation(event) {
     let heading = null;
     let accuracy = null;
-    if (Number.isFinite(event.webkitCompassHeading)) {
+    // Only iOS reports compass accuracy; elsewhere a missing accuracy just means "not reported".
+    const accuracySupported = Number.isFinite(event.webkitCompassHeading);
+    if (accuracySupported) {
       heading = normalizeDegrees(event.webkitCompassHeading);
       // iOS reports a negative accuracy when the compass is uncalibrated.
       accuracy =
@@ -76,6 +78,7 @@ export function createCompassTracker(onReading) {
       heading,
       cameraHeading: toCameraHeading(heading, screenAngle),
       accuracy,
+      accuracySupported,
       beta: finiteOrNull(event.beta),
       gamma: finiteOrNull(event.gamma),
       screenAngle,

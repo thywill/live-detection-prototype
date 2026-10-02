@@ -9,12 +9,21 @@ const toRadians = (degrees) => (degrees * Math.PI) / 180;
 const toDegrees = (radians) => (radians * 180) / Math.PI;
 
 // The long side of the frame always spans the long-side FOV, so portrait and non-4:3 streams scale from it.
-export function horizontalFovDeg(frameW, frameH) {
-  if (frameW >= frameH) {
+function fovForSide(side, frameW, frameH) {
+  const longSide = Math.max(frameW, frameH);
+  if (side >= longSide) {
     return CAMERA_LONG_SIDE_FOV_DEG;
   }
   const halfLong = toRadians(CAMERA_LONG_SIDE_FOV_DEG) / 2;
-  return toDegrees(2 * Math.atan(Math.tan(halfLong) * (frameW / frameH)));
+  return toDegrees(2 * Math.atan(Math.tan(halfLong) * (side / longSide)));
+}
+
+export function horizontalFovDeg(frameW, frameH) {
+  return fovForSide(frameW, frameW, frameH);
+}
+
+export function verticalFovDeg(frameW, frameH) {
+  return fovForSide(frameH, frameW, frameH);
 }
 
 export function objectBearing(box, frameW, frameH, cameraHeading) {

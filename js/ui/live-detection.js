@@ -16,6 +16,11 @@ import { createGpsTracker } from "../utils/geolocation.js";
 import { createCompassTracker, requestCompassPermission } from "../utils/compass.js";
 import { objectBearing } from "../utils/bearing.js";
 import {
+  DISTANCE_METHOD,
+  estimateDistance,
+  projectPosition,
+} from "../utils/position.js";
+import {
   clearLiveDetectionLog,
   getLiveDetectionLogCount,
   logDetectionFrame,
@@ -367,15 +372,25 @@ export function initLiveDetectionPage() {
           threshold: parameters.confidence,
           maxObjects: parameters.maxObjects,
         });
-        const cameraHeading = orientation?.cameraHeading ?? null;
-        const detections = rawDetections.map((detection) => ({
-          ...detection,
-          bearing: objectBearing(detection.box, frameW, frameH, cameraHeading),
-        }));
         const inferenceMs = performance.now() - t0;
         lastCompletedInferenceAt = performance.now();
         console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
         metrics.recordInferenceMs(inferenceMs);
+        const cameraHeading = orientation?.cameraHeading ?? null;
+        const gpsFix = gps?.getFix() ?? null;
+        const detections = rawDetections.map((detection) => {
+          const bearing = objectBearing(detection.box, frameW, frameH, cameraHeading);
+          const distance = estimateDistance(detection.label, detection.box, frameW, frameH);
+          const estimate = projectPosition(gpsFix, bearing, distance, orientation);
+          return {
+            ...detection,
+            bearing,
+            distance,
+            distanceMethod: distance == null ? null : DISTANCE_METHOD,
+            estLat: estimate?.lat ?? null,
+            estLon: estimate?.lon ?? null,
+          };
+        });
         renderClassificationReadout(null);
         renderBoundingBoxesOnContainer(mediaWrap, detections, frameCanvas);
 
@@ -386,7 +401,7 @@ export function initLiveDetectionPage() {
             frameH,
             inferenceMs,
             timestamp: Date.now(),
-            gpsFix: gps?.getFix() ?? null,
+            gpsFix,
             orientation,
             backend: backendInfo,
             modelId: getModelId(),

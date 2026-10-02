@@ -52,8 +52,11 @@ const FAN_MIN_RADIUS_PX = 16;
 const FAN_SPACING_PX = 13;
 
 let map = null;
+let detectionLayer = null;
+let fanListener = null;
 let leafletLoader = null;
 let openGeneration = 0;
+let mapMode = "viewer";
 
 function loadStylesheet(href) {
   if (document.querySelector(`link[href="${href}"]`)) {
@@ -159,36 +162,64 @@ function labelColor(label) {
   return LABEL_PALETTE[(hash >>> 0) % LABEL_PALETTE.length];
 }
 
-function extractDetectionPoints(rows) {
+function readCoordinate(lat, lon) {
+  if (lat == null || lon == null) {
+    return null;
+  }
+  const point = [Number(lat), Number(lon)];
+  return isValidCoordinate(...point) ? point : null;
+}
+
+function viewerPosition(row) {
+  const point = readCoordinate(row.lat, row.lon);
+  return point && { lat: point[0], lon: point[1] };
+}
+
+// Rows without an estimate are skipped, so "Where objects were" only shows projected detections.
+function objectPosition(row) {
+  const estimate = readCoordinate(row.est_lat, row.est_lon);
+  const viewer = readCoordinate(row.lat, row.lon);
+  if (!estimate || !viewer) {
+    return null;
+  }
+  return {
+    lat: estimate[0],
+    lon: estimate[1],
+    viewer,
+    distance: row.distance_m == null ? null : Number(row.distance_m),
+  };
+}
+
+function extractDetectionPoints(rows, positionOf) {
   const points = new Map();
   const labelCounts = new Map();
 
   for (const row of rows) {
-    if (row.lat == null || row.lon == null) {
-      continue;
-    }
-    const lat = Number(row.lat);
-    const lon = Number(row.lon);
+    const position = positionOf(row);
     const label = typeof row.label === "string" ? row.label.trim() : "";
-    if (!isValidCoordinate(lat, lon) || !label) {
+    if (!position || !label) {
       continue;
     }
 
     labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
 
+    const { lat, lon, ...extras } = position;
     const key = `${lat.toFixed(DEDUPE_DECIMALS)},${lon.toFixed(DEDUPE_DECIMALS)},${label}`;
     const confidence = Number(row.confidence);
     const existing = points.get(key);
     if (existing) {
       existing.count += 1;
+      // Distance and viewer position follow the highest-confidence sighting.
       if (Number.isFinite(confidence) && !(confidence <= existing.confidence)) {
         existing.confidence = confidence;
+        Object.assign(existing, extras);
       }
       continue;
     }
     points.set(key, {
       lat,
       lon,
+      ...extras,
       label,
       confidence: Number.isFinite(confidence) ? confidence : null,
       count: 1,
@@ -219,6 +250,8 @@ function themeColor(name, fallback) {
 function destroyMap() {
   map?.remove();
   map = null;
+  detectionLayer = null;
+  fanListener = null;
 }
 
 function detectionPopup(dot, stackSize) {
@@ -227,7 +260,9 @@ function detectionPopup(dot, stackSize) {
   title.className = "map-popup__title";
   const confidence =
     dot.confidence === null ? "—" : dot.confidence.toFixed(2);
-  title.textContent = `${dot.label} — ${confidence}`;
+  const distance =
+    dot.distance == null ? "" : ` · ~${Math.round(dot.distance)} m`;
+  title.textContent = `${dot.label} — ${confidence}${distance}`;
   content.appendChild(title);
 
   if (dot.count > 1) {
@@ -277,7 +312,7 @@ function drawDetections(L, detections, panel) {
         fillOpacity: 0.9,
       })
         .bindPopup(detectionPopup(dot, group.length))
-        .addTo(map);
+        .addTo(detectionLayer);
       if (group.length > 1) {
         fanned.push({ marker, center, offset: L.point(fanOffset(index, group.length)) });
       }
@@ -294,6 +329,46 @@ function drawDetections(L, detections, panel) {
 
   placeFanned();
   map.on("zoomend", placeFanned);
+  return placeFanned;
+}
+
+// Drawn before the dots so the dots stay on top and clickable.
+function drawSightLines(L, detections) {
+  for (const dot of detections.dots) {
+    L.polyline([dot.viewer, [dot.lat, dot.lon]], {
+      color: detections.colors.get(dot.label),
+      weight: 1.5,
+      opacity: 0.4,
+      interactive: false,
+    }).addTo(detectionLayer);
+  }
+}
+
+function fitView(points) {
+  if (points.length > 1) {
+    map.fitBounds(points, { padding: [32, 32] });
+  } else {
+    map.setView(points[0], SINGLE_POINT_ZOOM);
+  }
+}
+
+function showDetections(L, mode, path, snapshot) {
+  if (fanListener) {
+    map.off("zoomend", fanListener);
+  }
+  detectionLayer.clearLayers();
+  const detections = snapshot[mode];
+  if (mode === "objects") {
+    drawSightLines(L, detections);
+    fitView([...path, ...detections.dots.map((dot) => [dot.lat, dot.lon])]);
+  } else {
+    fitView(path);
+  }
+  fanListener = drawDetections(
+    L,
+    detections,
+    themeColor("--color-bg-panel", "#ffffff"),
+  );
 }
 
 // Rendered below the map rather than as a Leaflet control: controls always stack above popups.
@@ -337,7 +412,7 @@ function renderLegend(legend, detections) {
   }
 }
 
-function drawMap(L, container, path, detections) {
+function drawMap(L, container, path) {
   destroyMap();
   map = L.map(container, { zoomControl: true });
   L.tileLayer(TILE_URL, {
@@ -346,16 +421,11 @@ function drawMap(L, container, path, detections) {
   }).addTo(map);
 
   const accent = themeColor("--color-accent", "#2563eb");
-  const panel = themeColor("--color-bg-panel", "#ffffff");
   const start = path[0];
   const end = path.at(-1);
 
   if (path.length > 1) {
-    const line = L.polyline(path, { color: accent, weight: 4, opacity: 0.9 })
-      .addTo(map);
-    map.fitBounds(line.getBounds(), { padding: [32, 32] });
-  } else {
-    map.setView(start, SINGLE_POINT_ZOOM);
+    L.polyline(path, { color: accent, weight: 4, opacity: 0.9 }).addTo(map);
   }
 
   // Hollow rings drawn before the dots so they mark the location without covering detections.
@@ -380,7 +450,8 @@ function drawMap(L, container, path, detections) {
       .addTo(map);
   }
 
-  drawDetections(L, detections, panel);
+  // Added after the rings so detections draw above them.
+  detectionLayer = L.layerGroup().addTo(map);
 }
 
 export function initSessionMap() {
@@ -391,6 +462,8 @@ export function initSessionMap() {
   const errorNote = document.getElementById("map-error");
   const canvas = document.getElementById("map-canvas");
   const legend = document.getElementById("map-legend");
+  const modeGroup = document.getElementById("map-mode");
+  const objectsEmpty = document.getElementById("map-objects-empty");
   const summaryButton = document.getElementById("btn-summary");
 
   if (
@@ -400,9 +473,34 @@ export function initSessionMap() {
     !empty ||
     !errorNote ||
     !canvas ||
-    !legend
+    !legend ||
+    !modeGroup ||
+    !objectsEmpty
   ) {
     return;
+  }
+
+  const modeButtons = [...modeGroup.querySelectorAll("[data-map-mode]")];
+  let leaflet = null;
+  let path = [];
+  let snapshot = null;
+
+  function renderMode() {
+    for (const option of modeButtons) {
+      option.setAttribute(
+        "aria-pressed",
+        String(option.dataset.mapMode === mapMode),
+      );
+    }
+    objectsEmpty.classList.toggle(
+      "hidden",
+      !map || mapMode !== "objects" || snapshot.objects.dots.length > 0,
+    );
+    if (!map) {
+      return;
+    }
+    showDetections(leaflet, mapMode, path, snapshot);
+    renderLegend(legend, snapshot[mapMode]);
   }
 
   function clearLegend() {
@@ -418,6 +516,8 @@ export function initSessionMap() {
     openGeneration += 1;
     destroyMap();
     clearLegend();
+    modeGroup.classList.add("hidden");
+    objectsEmpty.classList.add("hidden");
     panel.classList.add("hidden");
     button.setAttribute("aria-pressed", "false");
     if (restoreFocus) {
@@ -432,16 +532,21 @@ export function initSessionMap() {
     }
 
     const rows = getLiveDetectionLog().slice();
-    const path = extractPath(rows);
-    const detections = extractDetectionPoints(rows);
+    path = extractPath(rows);
+    snapshot = {
+      viewer: extractDetectionPoints(rows, viewerPosition),
+      objects: extractDetectionPoints(rows, objectPosition),
+    };
     button.setAttribute("aria-pressed", "true");
     panel.classList.remove("hidden");
     errorNote.classList.add("hidden");
+    objectsEmpty.classList.add("hidden");
     clearLegend();
 
     const hasPath = path.length > 0;
     empty.classList.toggle("hidden", hasPath);
     canvas.classList.toggle("hidden", !hasPath);
+    modeGroup.classList.toggle("hidden", !hasPath);
     if (!hasPath) {
       destroyMap();
       closeButton.focus();
@@ -453,8 +558,9 @@ export function initSessionMap() {
       if (generation !== openGeneration || !L) {
         return;
       }
-      drawMap(L, canvas, path, detections);
-      renderLegend(legend, detections);
+      leaflet = L;
+      drawMap(L, canvas, path);
+      renderMode();
     } catch (error) {
       console.error("[MAP] map failed:", error);
       if (generation !== openGeneration) {
@@ -462,8 +568,19 @@ export function initSessionMap() {
       }
       destroyMap();
       canvas.classList.add("hidden");
+      modeGroup.classList.add("hidden");
       errorNote.classList.remove("hidden");
     }
+  }
+
+  for (const option of modeButtons) {
+    option.addEventListener("click", () => {
+      if (option.dataset.mapMode === mapMode) {
+        return;
+      }
+      mapMode = option.dataset.mapMode;
+      renderMode();
+    });
   }
 
   button.addEventListener("click", () => {
