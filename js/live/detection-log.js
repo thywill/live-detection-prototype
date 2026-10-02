@@ -55,6 +55,7 @@ export function logDetectionFrame({
       device_beta: orientation?.beta ?? null,
       device_gamma: orientation?.gamma ?? null,
       screen_angle: orientation?.screenAngle ?? null,
+      screen_orientation_type: orientation?.screenOrientationType ?? null,
       model: modelId,
       dtype: backend.dtype,
       device: backend.device,

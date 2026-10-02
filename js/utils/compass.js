@@ -3,11 +3,11 @@
 // cameraHeading corrects it for screen rotation so it is the direction the back camera faces.
 
 // webkitCompassHeading (and 360 - alpha) follow the device's portrait top edge, not the back camera,
-// so in landscape the raw value is off by the screen rotation. camera = raw + SIGN * screenAngle.
-// Confirm against the field data (iPad, true ≈ 333°): landscape upright read 240 and flipped read 60,
-// so with whichever angle (90 / 270) each orientation reports, the result must land near 333.
-// Flip to -1 if the corrected value moves the wrong way.
-const SCREEN_ANGLE_SIGN = 1;
+// so camera = raw - (screenAngle - PORTRAIT_SCREEN_ANGLE).
+// PORTRAIT_SCREEN_ANGLE is the angle the device reports when held upright in portrait, measured on the
+// M1 iPad Pro (iPadOS 26), whose natural orientation is landscape. Other devices (e.g. an M4 iPad Pro)
+// may report a different value and need their own check.
+const PORTRAIT_SCREEN_ANGLE = 90;
 
 // iOS only delivers orientation events after requestPermission() runs inside a user gesture,
 // so call this synchronously from the click handler, before any await.
@@ -34,13 +34,17 @@ function readScreenAngle() {
   return finiteOrNull(screen.orientation?.angle ?? window.orientation);
 }
 
+function readScreenOrientationType() {
+  return screen.orientation?.type ?? null;
+}
+
 // window.orientation reports -90 where screen.orientation reports 270; normalizing handles both.
 function toCameraHeading(heading, screenAngle) {
   if (heading == null || screenAngle == null) {
     return null;
   }
   return normalizeDegrees(
-    heading + SCREEN_ANGLE_SIGN * normalizeDegrees(screenAngle),
+    heading - (normalizeDegrees(screenAngle) - PORTRAIT_SCREEN_ANGLE),
   );
 }
 
@@ -75,6 +79,7 @@ export function createCompassTracker(onReading) {
       beta: finiteOrNull(event.beta),
       gamma: finiteOrNull(event.gamma),
       screenAngle,
+      screenOrientationType: readScreenOrientationType(),
     };
     onReading?.(cachedReading);
   }
