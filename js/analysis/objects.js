@@ -82,7 +82,11 @@ function drawBoundingBoxes(container, results, dimensionSource) {
 
     const labelEl = document.createElement("span");
     labelEl.className = "bounding-box__label";
-    labelEl.textContent = `${result.label} ${formatObjectScore(result.score)}`;
+    // TEMPORARY field-test readout: bearing appended to the label.
+    const bearing = Number.isFinite(result.bearing)
+      ? ` · ${Math.round(result.bearing) % 360}°`
+      : "";
+    labelEl.textContent = `${result.label} ${formatObjectScore(result.score)}${bearing}`;
     labelEl.style.backgroundColor = color;
 
     boxEl.appendChild(labelEl);

@@ -51,6 +51,7 @@ export function logDetectionFrame({
       gps_timestamp: gpsFix?.timestamp ?? null,
       heading: orientation?.heading ?? null,
       camera_heading: orientation?.cameraHeading ?? null,
+      object_bearing: detection.bearing ?? null,
       heading_accuracy: orientation?.accuracy ?? null,
       device_beta: orientation?.beta ?? null,
       device_gamma: orientation?.gamma ?? null,

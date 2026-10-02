@@ -14,6 +14,7 @@ import {
 } from "../models.js";
 import { createGpsTracker } from "../utils/geolocation.js";
 import { createCompassTracker, requestCompassPermission } from "../utils/compass.js";
+import { objectBearing } from "../utils/bearing.js";
 import {
   clearLiveDetectionLog,
   getLiveDetectionLogCount,
@@ -362,10 +363,15 @@ export function initLiveDetectionPage() {
           });
         }
       } else {
-        const detections = await detectObjectsFromSource(input, {
+        const rawDetections = await detectObjectsFromSource(input, {
           threshold: parameters.confidence,
           maxObjects: parameters.maxObjects,
         });
+        const cameraHeading = orientation?.cameraHeading ?? null;
+        const detections = rawDetections.map((detection) => ({
+          ...detection,
+          bearing: objectBearing(detection.box, frameW, frameH, cameraHeading),
+        }));
         const inferenceMs = performance.now() - t0;
         lastCompletedInferenceAt = performance.now();
         console.log(`[TIMING] live: ${inferenceMs.toFixed(0)}ms`);
