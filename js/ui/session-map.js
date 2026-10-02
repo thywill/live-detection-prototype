@@ -46,6 +46,10 @@ const LABEL_PALETTE = [
 const LEGEND_LIMIT = 8;
 // 5 decimal places is ~1 m, finer than phone GPS accuracy.
 const DEDUPE_DECIMALS = 5;
+// Screen-space spread for dots that share a location; recomputed on zoom so it stays constant in pixels.
+const FAN_MIN_RADIUS_PX = 16;
+// Arc length reserved per fanned dot: dot diameter plus a small gap.
+const FAN_SPACING_PX = 13;
 
 let map = null;
 let leafletLoader = null;
@@ -217,7 +221,7 @@ function destroyMap() {
   map = null;
 }
 
-function detectionPopup(dot) {
+function detectionPopup(dot, stackSize) {
   const content = document.createElement("div");
   const title = document.createElement("p");
   title.className = "map-popup__title";
@@ -232,21 +236,64 @@ function detectionPopup(dot) {
     note.textContent = `Highest of ${dot.count} detections here`;
     content.appendChild(note);
   }
+
+  if (stackSize > 1) {
+    const stacked = document.createElement("p");
+    stacked.className = "map-popup__note";
+    stacked.textContent = `Stacked: ${stackSize} labels at this spot`;
+    content.appendChild(stacked);
+  }
   return content;
 }
 
+function fanOffset(index, count) {
+  const radius = Math.max(
+    FAN_MIN_RADIUS_PX,
+    (count * FAN_SPACING_PX) / (2 * Math.PI),
+  );
+  const angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
+  return [radius * Math.cos(angle), radius * Math.sin(angle)];
+}
+
 function drawDetections(L, detections, panel) {
+  const groups = new Map();
   for (const dot of detections.dots) {
-    L.circleMarker([dot.lat, dot.lon], {
-      radius: 5,
-      color: panel,
-      weight: 1,
-      fillColor: detections.colors.get(dot.label),
-      fillOpacity: 0.9,
-    })
-      .bindPopup(detectionPopup(dot))
-      .addTo(map);
+    const key = `${dot.lat.toFixed(DEDUPE_DECIMALS)},${dot.lon.toFixed(DEDUPE_DECIMALS)}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(dot);
   }
+
+  const fanned = [];
+  for (const group of groups.values()) {
+    const center = L.latLng(group[0].lat, group[0].lon);
+    group.forEach((dot, index) => {
+      const marker = L.circleMarker(center, {
+        radius: 5,
+        color: panel,
+        weight: 1,
+        fillColor: detections.colors.get(dot.label),
+        fillOpacity: 0.9,
+      })
+        .bindPopup(detectionPopup(dot, group.length))
+        .addTo(map);
+      if (group.length > 1) {
+        fanned.push({ marker, center, offset: L.point(fanOffset(index, group.length)) });
+      }
+    });
+  }
+
+  function placeFanned() {
+    const zoom = map.getZoom();
+    for (const item of fanned) {
+      const point = map.project(item.center, zoom).add(item.offset);
+      item.marker.setLatLng(map.unproject(point, zoom));
+    }
+  }
+
+  placeFanned();
+  map.on("zoomend", placeFanned);
 }
 
 // Rendered below the map rather than as a Leaflet control: controls always stack above popups.
@@ -311,14 +358,13 @@ function drawMap(L, container, path, detections) {
     map.setView(start, SINGLE_POINT_ZOOM);
   }
 
-  drawDetections(L, detections, panel);
-
+  // Hollow rings drawn before the dots so they mark the location without covering detections.
+  // Different radii keep both rings visible when start and end coincide.
   L.circleMarker(start, {
-    radius: 7,
-    color: panel,
-    weight: 2,
-    fillColor: "#16a34a",
-    fillOpacity: 1,
+    radius: 10,
+    color: "#16a34a",
+    weight: 3,
+    fill: false,
   })
     .bindTooltip("Start")
     .addTo(map);
@@ -326,14 +372,15 @@ function drawMap(L, container, path, detections) {
   if (path.length > 1) {
     L.circleMarker(end, {
       radius: 7,
-      color: panel,
-      weight: 2,
-      fillColor: "#dc2626",
-      fillOpacity: 1,
+      color: "#dc2626",
+      weight: 3,
+      fill: false,
     })
       .bindTooltip("End")
       .addTo(map);
   }
+
+  drawDetections(L, detections, panel);
 }
 
 export function initSessionMap() {
